@@ -1,60 +1,68 @@
 # Stack Decision
 
-**Status:** pending — decision target is Day 2 morning (2026-04-25), once team skills are confirmed.
+**Status:** ✅ Decided 2026-04-24.
 
-## Constraints
+## Final stack
 
-- 4-person team
-- 2-day hackathon (Day 1: 2026-04-24, Day 2: 2026-04-25, final deadline 5pm Sat)
-- Demo only — no real 311 API submission, no persistence, no auth
-- Judging is based on a <5 min video, not live interaction
-- Need ANTHROPIC_API_KEY to stay server-side (cannot be exposed to browser)
+| Layer | Choice | Purpose |
+|---|---|---|
+| Language | Python 3.11 | What everyone writes in |
+| Framework | Streamlit | Turns the Python script into a web app |
+| AI | Anthropic SDK + Claude Sonnet 4.6 | Vision classification of uploaded photos |
+| Image handling | Pillow | Read images, extract EXIF |
+| Map | folium + streamlit-folium | NYC map with pin-per-photo |
+| Geocoding | geopy (Nominatim / OpenStreetMap) | Address text → lat/long when EXIF is missing |
+| Hosting | Streamlit Community Cloud | Free public URL, auto-deploys from GitHub main |
 
-## Options
+`requirements.txt` (to be created when code is scaffolded):
 
-### A. Next.js (TypeScript) on Vercel
+```
+streamlit>=1.40
+anthropic>=0.45
+Pillow>=11.0
+folium>=0.17
+streamlit-folium>=0.22
+geopy>=2.4
+```
 
-Frontend + API routes in one codebase. Deploys to a public URL.
+Six dependencies. One language. One deploy target.
 
-- ✅ Polished, real-product look
-- ✅ Single deploy, no CORS
-- ✅ Shareable URL for the website deliverable
-- ❌ Requires React/TS familiarity
-- ❌ More setup surface area than needed for a demo
+## Location strategy (EXIF-first)
 
-### B. Streamlit (Python)
+For each uploaded photo:
 
-Single Python file becomes a web app. Deploys free to Streamlit Community Cloud.
+1. **Try EXIF GPS tags first.** Pillow exposes EXIF; the `GPSInfo` tag contains lat/long when the phone captured it. Most iPhone and Android photos taken in the Camera app include this.
+2. **If EXIF is missing or the photo was shared through a service that strips it** (AirDrop preserves; most messaging apps and social media strip), show a text input: *"Where did you see this? (e.g., 199 Chambers St, New York, NY)"*.
+3. **Geocode the user-typed address** via Nominatim (`geopy`). No API key required. 1 req/sec limit and a User-Agent header requirement — both fine for demo scale.
+4. **Map pin placement** uses whichever lat/long was resolved.
 
-- ✅ Anyone with Python can contribute — lowest team coordination cost
-- ✅ Fastest path from zero to working demo
-- ✅ Handles file upload + layout out of the box
-- ❌ Recognizable Streamlit aesthetic (not a blocker — video is what's judged)
+The "magic moment" of the demo is EXIF-first: drag a photo in, see it auto-pin on the NYC map without typing anything. The fallback keeps it robust on images that have been shared.
 
-### C. Gradio (Python)
+## Why Streamlit (for the record / for the pitch)
 
-Even simpler than Streamlit, but more rigid for multi-output UIs.
+Options considered: Next.js (TypeScript), Streamlit (Python), Gradio (Python), Python-backend + Next.js-frontend hybrid.
 
-- ✅ Minimum code for input → output demos
-- ❌ Harder to lay out three pieces of info (category + agency + report text) nicely
-- Generally: if we'd pick Gradio, we'd pick Streamlit instead
+Streamlit won because:
 
-## Decision criteria
+- **Team skill fit.** Python-only stack lets all four teammates contribute to any file.
+- **Speed.** ~30 lines of Python gets a working upload + classify + display. Every hour not spent on framework is an hour on prompt quality, guide content, or the video pitch — where the points are.
+- **No stack split.** No frontend/backend coordination, no CORS, no two deploys to fail.
+- **Map integration.** `streamlit-folium` is plug-and-play; folium handles image-in-popup natively.
+- **Demo reliability.** Streamlit Community Cloud + video recorded on localhost = minimal surface area for things to break on Saturday.
 
-**Primary:** does anyone on the team know React/JS/TS beyond basics?
+## Tradeoffs we accepted
 
-- Yes → Option A is viable; weigh polish vs speed
-- No → Option B, no debate
+- **Aesthetic.** Streamlit has a recognizable look. Judging weights (30% impact, 20% technical, 20% AI, 15% code quality, 10% creativity, 5% presentation) don't explicitly reward polish, and the video is what they watch.
+- **Scale ceiling.** If TrashAI continues past the hackathon, the Streamlit app gets rewritten once it needs accounts, persistence across sessions, or a real backend. That's a Week 4+ problem, not a Day 2 one.
+- **Cold starts on Community Cloud.** Apps sleep after ~7 days of no traffic; first hit after sleep takes ~30s. Mitigation: visit the URL to warm it up before judging.
 
-**Secondary:** does the team want a shareable URL for the website deliverable, or is a local demo recording fine?
+## Options we rejected
 
-- Shareable URL: A (Vercel) or B (Streamlit Cloud) both work
-- Local demo: either, no advantage
+### Next.js (TypeScript)
+Considered. Would produce a more polished demo. Rejected because no team member has enough React experience to be productive in 2 days, and the learning cost would come out of prompt-quality and guide-content time.
 
-## Current lean
+### Gradio
+Simpler than Streamlit for a single input → single output demo. Rejected because our UI needs an image, an address input, a map, and a guide card all on screen — Streamlit's layout primitives are more flexible.
 
-Option B (Streamlit) unless a React-comfortable teammate steps forward. Reasoning: judging weights reward working AI + clear pitch, not frontend polish, and Streamlit frees the team to spend time on prompt quality and the routing taxonomy, which is where the points live.
-
-## Decision
-
-_TBD — fill in once confirmed with the team._
+### Python backend + Next.js frontend
+Industry-standard pattern. Rejected because we use no Python-specific ML libraries (the entire AI call is one HTTP request to Claude that can be made equally from either language), so the split adds all the integration cost with none of the benefits.
