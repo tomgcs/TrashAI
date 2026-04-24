@@ -1,0 +1,6 @@
+streamlit>=1.40
+anthropic>=0.45
+Pillow>=11.0
+folium>=0.17
+streamlit-folium>=0.22
+geopy>=2.4

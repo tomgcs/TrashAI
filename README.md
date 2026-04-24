@@ -44,21 +44,56 @@ No database, no user accounts, no backend — demo runs entirely in session stat
 
 ```
 TrashAI/
-├── streamlit_app.py         # main app entry (not yet scaffolded)
-├── routing.py               # issue category → NYC agency guide (not yet scaffolded)
-├── prompt.py                # Claude Vision prompt (not yet scaffolded)
-├── requirements.txt         # Python deps (not yet scaffolded)
+├── streamlit_app.py         # UI: upload, location resolution, result card, map
+├── classify.py              # Claude Vision call + JSON parsing
+├── prompt.py                # the classification prompt (one string constant)
+├── routing.py               # issue category → guide record (agency, link, instructions)
+├── location.py              # EXIF GPS extraction + address geocoding
+├── requirements.txt         # Python deps
 ├── .streamlit/
-│   └── secrets.toml         # LOCAL ONLY — gitignored
+│   ├── secrets.toml.example # template — copy to secrets.toml and fill in key
+│   └── secrets.toml         # LOCAL ONLY, gitignored
 ├── docs/
 │   ├── design-doc.md        # link to Google Doc + signoff tracker
-│   ├── routing.md           # guide content: category → agency, channel, link, instructions
-│   ├── prompt.md            # Claude Vision prompt + JSON output contract
+│   ├── routing.md           # guide content research (source for routing.py)
+│   ├── prompt.md            # prompt iterations + known failure modes
 │   └── stack-decision.md    # final stack + reasoning
 ├── sample-images/           # test photos for prompt iteration
 ├── LICENSE
 └── .gitignore
 ```
+
+## Getting started (local dev)
+
+```bash
+# 1. Clone
+git clone https://github.com/tomgcs/TrashAI
+cd TrashAI
+
+# 2. Virtualenv + install
+python3.11 -m venv .venv
+source .venv/bin/activate            # Windows: .venv\Scripts\activate
+pip install -r requirements.txt
+
+# 3. API key
+mkdir -p .streamlit
+cp .streamlit/secrets.toml.example .streamlit/secrets.toml
+# open .streamlit/secrets.toml and paste your ANTHROPIC_API_KEY
+
+# 4. Run
+streamlit run streamlit_app.py
+```
+
+Visit `http://localhost:8501`. Upload any photo; if it has GPS EXIF it auto-pins, otherwise type an address.
+
+## Team workstreams
+
+| Person | File(s) | Day 1 | Day 2 |
+|---|---|---|---|
+| A — UI | `streamlit_app.py` | layout, file upload, result card | polish, map styling, session handling |
+| B — AI | `prompt.py`, `classify.py` | iterate prompt against `sample-images/` | JSON reliability, few-shot examples |
+| C — Guide | `routing.py`, `docs/routing.md` | verify every link and service-type against portal.311.nyc.gov | review guide text in-app for clarity |
+| D — Deliverables | `docs/`, slides, website | design doc + slides + website stub | <5 min video, final slides/site, pitch |
 
 ## Hackathon checklist
 
