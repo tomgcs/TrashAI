@@ -2,14 +2,18 @@ import base64
 import hashlib
 import json
 import re
+from io import BytesIO
 
 import streamlit as st
 from anthropic import Anthropic
+from PIL import Image
 
 from prompt import CLASSIFICATION_PROMPT
 
 MODEL = "claude-sonnet-4-6"
 _PLACEHOLDER_KEYS = {"", "REPLACE_ME_WITH_YOUR_KEY", "sk-ant-..."}
+_API_MAX_DIMENSION = 1600
+_API_JPEG_QUALITY = 85
 
 _STUB_CATEGORIES = [
     "curbside_trash",
@@ -37,8 +41,9 @@ def classify_image(image_bytes: bytes, media_type: str = "image/jpeg") -> dict:
     if is_stub_mode():
         return _stub_classify(image_bytes)
 
+    api_bytes, api_media_type = _prepare_for_api(image_bytes)
     client = _client()
-    b64 = base64.standard_b64encode(image_bytes).decode("utf-8")
+    b64 = base64.standard_b64encode(api_bytes).decode("utf-8")
     response = client.messages.create(
         model=MODEL,
         max_tokens=1024,
@@ -48,7 +53,7 @@ def classify_image(image_bytes: bytes, media_type: str = "image/jpeg") -> dict:
                 "content": [
                     {
                         "type": "image",
-                        "source": {"type": "base64", "media_type": media_type, "data": b64},
+                        "source": {"type": "base64", "media_type": api_media_type, "data": b64},
                     },
                     {"type": "text", "text": CLASSIFICATION_PROMPT},
                 ],
@@ -57,6 +62,16 @@ def classify_image(image_bytes: bytes, media_type: str = "image/jpeg") -> dict:
     )
     text = response.content[0].text
     return _parse_json(text)
+
+
+def _prepare_for_api(image_bytes: bytes) -> tuple:
+    img = Image.open(BytesIO(image_bytes))
+    img.thumbnail((_API_MAX_DIMENSION, _API_MAX_DIMENSION))
+    if img.mode != "RGB":
+        img = img.convert("RGB")
+    buf = BytesIO()
+    img.save(buf, format="JPEG", quality=_API_JPEG_QUALITY)
+    return buf.getvalue(), "image/jpeg"
 
 
 def _stub_classify(image_bytes: bytes) -> dict:

@@ -7,6 +7,10 @@ from geopy.geocoders import Nominatim
 _GPS_IFD_TAG = 0x8825
 _geocoder = Nominatim(user_agent="trashai-cuny-aic-2026")
 
+# NYC bounding box: covers all 5 boroughs with a small buffer.
+# (sw_lat, sw_lng), (ne_lat, ne_lng)
+_NYC_VIEWBOX = [(40.477, -74.260), (40.920, -73.700)]
+
 
 def get_location_from_exif(image_bytes: bytes) -> Optional[Tuple[float, float]]:
     try:
@@ -26,7 +30,13 @@ def get_location_from_exif(image_bytes: bytes) -> Optional[Tuple[float, float]]:
 
 def geocode_address(address: str) -> Optional[Tuple[float, float]]:
     try:
-        location = _geocoder.geocode(address, timeout=10)
+        location = _geocoder.geocode(
+            address,
+            timeout=10,
+            country_codes="us",
+            viewbox=_NYC_VIEWBOX,
+            bounded=True,
+        )
         if location:
             return (location.latitude, location.longitude)
         return None

@@ -1,4 +1,5 @@
 import base64
+import html
 from io import BytesIO
 
 import folium
@@ -72,6 +73,9 @@ if uploaded:
                 category=result["category"],
                 display_name=guide["display_name"],
                 image_bytes=image_bytes,
+                reasoning=result.get("reasoning", ""),
+                notable_details=result.get("notable_details", ""),
+                confidence=result.get("confidence", ""),
             )
             st.session_state.last_result = (result, guide)
 
@@ -109,9 +113,36 @@ for pin in pins:
         continue
 
     thumb_b64 = base64.b64encode(_thumbnail(image_bytes)).decode("utf-8")
+    display_name = html.escape(pin.get("display_name", ""))
+    reasoning = html.escape(pin.get("reasoning", ""))
+    notable_details = html.escape(pin.get("notable_details", ""))
+    confidence = html.escape(pin.get("confidence", ""))
+
+    reasoning_html = (
+        f"<div style='margin-top:6px;font-size:12px;color:#333;line-height:1.3'>{reasoning}</div>"
+        if reasoning
+        else ""
+    )
+    details_html = (
+        f"<div style='margin-top:4px;font-size:11px;color:#555;line-height:1.3'>"
+        f"<b>Details:</b> {notable_details}</div>"
+        if notable_details
+        else ""
+    )
+    confidence_html = (
+        f"<div style='margin-top:4px;font-size:10px;color:#888;text-transform:uppercase;letter-spacing:0.03em'>"
+        f"Confidence: {confidence}</div>"
+        if confidence
+        else ""
+    )
     popup_html = (
-        f"<b>{pin['display_name']}</b><br>"
-        f"<img src='data:image/jpeg;base64,{thumb_b64}' width='200'>"
+        f"<div style='font-family:sans-serif;max-width:240px'>"
+        f"<div style='font-weight:600;font-size:13px;margin-bottom:4px'>{display_name}</div>"
+        f"<img src='data:image/jpeg;base64,{thumb_b64}' width='220' style='border-radius:4px;display:block'>"
+        f"{reasoning_html}"
+        f"{details_html}"
+        f"{confidence_html}"
+        f"</div>"
     )
     icon_html = (
         f"<div style=\""
@@ -124,7 +155,7 @@ for pin in pins:
     folium.Marker(
         [pin["lat"], pin["lng"]],
         icon=folium.DivIcon(html=icon_html, icon_size=(48, 48), icon_anchor=(24, 24)),
-        popup=folium.Popup(popup_html, max_width=260),
+        popup=folium.Popup(popup_html, max_width=280),
         tooltip=pin["display_name"],
     ).add_to(m)
 st_folium(m, width=None, height=500, returned_objects=[])

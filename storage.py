@@ -17,7 +17,16 @@ def load_pins() -> list[dict]:
         return []
 
 
-def save_pin(lat: float, lng: float, category: str, display_name: str, image_bytes: bytes) -> dict:
+def save_pin(
+    lat: float,
+    lng: float,
+    category: str,
+    display_name: str,
+    image_bytes: bytes,
+    reasoning: str = "",
+    notable_details: str = "",
+    confidence: str = "",
+) -> dict:
     _IMAGES_DIR.mkdir(parents=True, exist_ok=True)
     image_name = f"{uuid.uuid4().hex}.jpg"
     (_IMAGES_DIR / image_name).write_bytes(image_bytes)
@@ -28,6 +37,9 @@ def save_pin(lat: float, lng: float, category: str, display_name: str, image_byt
         "category": category,
         "display_name": display_name,
         "image": image_name,
+        "reasoning": reasoning,
+        "notable_details": notable_details,
+        "confidence": confidence,
     }
     pins = load_pins()
     pins.append(pin)
