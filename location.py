@@ -1,4 +1,5 @@
 from io import BytesIO
+from typing import Optional, Tuple
 
 from PIL import Image
 from geopy.geocoders import Nominatim
@@ -7,7 +8,7 @@ _GPS_IFD_TAG = 0x8825
 _geocoder = Nominatim(user_agent="trashai-cuny-aic-2026")
 
 
-def get_location_from_exif(image_bytes: bytes) -> tuple[float, float] | None:
+def get_location_from_exif(image_bytes: bytes) -> Optional[Tuple[float, float]]:
     try:
         img = Image.open(BytesIO(image_bytes))
         exif = img.getexif()
@@ -23,7 +24,7 @@ def get_location_from_exif(image_bytes: bytes) -> tuple[float, float] | None:
         return None
 
 
-def geocode_address(address: str) -> tuple[float, float] | None:
+def geocode_address(address: str) -> Optional[Tuple[float, float]]:
     try:
         location = _geocoder.geocode(address, timeout=10)
         if location:

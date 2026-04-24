@@ -34,9 +34,14 @@ __pycache__/
 .venv/
 venv/
 env/
+data/pins.json
 .pytest_cache/
 .ipynb_checkpoints/
 
 # Secrets
 *.pem
 *.key
+
+# User-uploaded pin images (tracked dir kept via .gitkeep)
+data/images/*
+!data/images/.gitkeep

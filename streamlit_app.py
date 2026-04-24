@@ -6,9 +6,10 @@ import streamlit as st
 from PIL import Image
 from streamlit_folium import st_folium
 
-from classify import classify_image
+from classify import classify_image, is_stub_mode
 from location import geocode_address, get_location_from_exif
 from routing import get_guide
+from storage import load_image, load_pins, save_pin
 
 NYC_CENTER = [40.7128, -74.0060]
 
@@ -25,13 +26,14 @@ def _thumbnail(image_bytes: bytes, max_size: int = 400) -> bytes:
 
 st.set_page_config(page_title="TrashAI", page_icon="📍", layout="wide")
 
-if "pins" not in st.session_state:
-    st.session_state.pins = []
 if "last_result" not in st.session_state:
     st.session_state.last_result = None
 
 st.title("TrashAI")
 st.caption("Snap a photo of anything needing civic action in NYC. We'll tell you exactly where and how to report it.")
+
+if is_stub_mode():
+    st.warning("⚙️ Stub mode: Claude Vision is disabled. Category is picked from the image hash for demo purposes. Add your API key to `.streamlit/secrets.toml` to enable real classification.")
 
 uploaded = st.file_uploader("Upload a photo", type=["jpg", "jpeg", "png"])
 
@@ -64,14 +66,12 @@ if uploaded:
             with st.spinner("Classifying with Claude Vision..."):
                 result = classify_image(image_bytes, media_type=media_type)
             guide = get_guide(result["category"])
-            st.session_state.pins.append(
-                {
-                    "lat": lat,
-                    "lng": lng,
-                    "category": result["category"],
-                    "display_name": guide["display_name"],
-                    "image_bytes": image_bytes,
-                }
+            save_pin(
+                lat=lat,
+                lng=lng,
+                category=result["category"],
+                display_name=guide["display_name"],
+                image_bytes=image_bytes,
             )
             st.session_state.last_result = (result, guide)
 
@@ -95,16 +95,35 @@ if st.session_state.last_result:
             st.link_button("Open reporting page", guide["link"], use_container_width=True)
 
 st.divider()
-st.subheader(f"Map ({len(st.session_state.pins)} pinned)")
+pins = load_pins()
+st.subheader(f"Map ({len(pins)} pinned)")
 m = folium.Map(location=NYC_CENTER, zoom_start=11, tiles="cartodbpositron")
-for pin in st.session_state.pins:
-    thumb_b64 = base64.b64encode(_thumbnail(pin["image_bytes"])).decode("utf-8")
+for pin in pins:
+    image_bytes = load_image(pin["image"])
+    if image_bytes is None:
+        folium.Marker(
+            [pin["lat"], pin["lng"]],
+            popup=folium.Popup(f"<b>{pin['display_name']}</b>", max_width=260),
+            tooltip=pin["display_name"],
+        ).add_to(m)
+        continue
+
+    thumb_b64 = base64.b64encode(_thumbnail(image_bytes)).decode("utf-8")
     popup_html = (
         f"<b>{pin['display_name']}</b><br>"
         f"<img src='data:image/jpeg;base64,{thumb_b64}' width='200'>"
     )
+    icon_html = (
+        f"<div style=\""
+        f"width:48px;height:48px;border-radius:50%;"
+        f"border:3px solid white;box-shadow:0 2px 6px rgba(0,0,0,0.35);"
+        f"background-image:url('data:image/jpeg;base64,{thumb_b64}');"
+        f"background-size:cover;background-position:center;"
+        f"\"></div>"
+    )
     folium.Marker(
         [pin["lat"], pin["lng"]],
+        icon=folium.DivIcon(html=icon_html, icon_size=(48, 48), icon_anchor=(24, 24)),
         popup=folium.Popup(popup_html, max_width=260),
         tooltip=pin["display_name"],
     ).add_to(m)
