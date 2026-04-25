@@ -564,7 +564,21 @@ st.markdown(
       /* File uploader: compact; hide the dropzone instructions once a file is uploaded to save ~60px */
       .st-key-mobile-root [data-testid='stFileUploader'] {margin: 0 !important;}
       .st-key-mobile-root [data-testid='stFileUploaderDropzone'] {
-        padding: 0.3rem 0.5rem !important; min-height: 0 !important;
+        padding: 0.5rem 0.75rem !important; min-height: 0 !important;
+        justify-content: center !important;
+        text-align: center !important;
+      }
+      /* Center the dropzone's icon + label so it reads like a button, not a banner */
+      .st-key-mobile-root [data-testid='stFileUploaderDropzone'] > section,
+      .st-key-mobile-root [data-testid='stFileUploaderDropzone'] > div {
+        justify-content: center !important;
+        align-items: center !important;
+        width: auto !important;
+        flex: 0 0 auto !important;
+      }
+      .st-key-mobile-root [data-testid='stFileUploaderDropzoneInstructions'] {
+        padding-left: 0 !important; margin-left: 0 !important;
+        flex: 0 0 auto !important;
       }
       .st-key-mobile-root [data-testid='stFileUploaderFile'] {
         padding: 0.15rem 0.3rem !important; font-size: 0.72rem !important;
