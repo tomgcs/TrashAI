@@ -43,7 +43,215 @@ def _thumbnail(image_bytes: bytes, max_size: int = 400) -> bytes:
     return buf.getvalue()
 
 
-def _build_folium_map() -> folium.Map:
+st.set_page_config(page_title="TrashAI", page_icon="📍", layout="wide")
+
+if "last_result" not in st.session_state:
+    st.session_state.last_result = None
+
+st.markdown(
+    """
+    <style>
+    [data-testid='stFileUploaderDropzoneInstructions'] small,
+    [data-testid='stFileUploaderDropzoneInstructions'] span:last-child,
+    [data-testid='stFileDropzoneInstructions'] small,
+    [data-testid='stFileUploaderDropzone'] small {display:none !important;}
+
+    /* Desktop: full-viewport map on left, scroll panel on right, no page scroll */
+    @media (min-width: 641px) {
+      html, body {overflow: hidden !important; height: 100vh !important;}
+      [data-testid='stApp'], [data-testid='stAppViewContainer'],
+      [data-testid='stMain'], .stMain, section.main {
+        overflow: hidden !important; height: 100vh !important; max-height: 100vh !important;
+      }
+      header[data-testid='stHeader'] {display: none !important;}
+      [data-testid='stToolbar'] {display: none !important;}
+      footer {display: none !important;}
+
+      [data-testid='stMainBlockContainer'], section.main > div.block-container,
+      .block-container, div.block-container {
+        padding: 0 !important; margin: 0 !important;
+        max-width: 100% !important; width: 100% !important;
+        height: 100vh !important; max-height: 100vh !important;
+        overflow: hidden !important;
+      }
+
+      /* Columns row fills viewport */
+      div[data-testid='stHorizontalBlock'] {
+        gap: 0 !important;
+        height: 100vh !important; min-height: 100vh !important;
+        margin: 0 !important;
+      }
+      div[data-testid='stHorizontalBlock'] > div[data-testid='stColumn'] {
+        height: 100vh !important; max-height: 100vh !important;
+      }
+      /* Left column (map): no padding, fill */
+      div[data-testid='stHorizontalBlock'] > div[data-testid='stColumn']:first-child,
+      div[data-testid='stHorizontalBlock'] > div[data-testid='stColumn']:first-child > div[data-testid='stVerticalBlock'],
+      div[data-testid='stHorizontalBlock'] > div[data-testid='stColumn']:first-child [data-testid='stElementContainer'],
+      div[data-testid='stHorizontalBlock'] > div[data-testid='stColumn']:first-child [data-testid='stVerticalBlockBorderWrapper'] {
+        padding: 0 !important; gap: 0 !important; height: 100vh !important;
+      }
+      /* Component iframe wrapper + iframe fill full viewport */
+      div[data-testid='stHorizontalBlock'] > div[data-testid='stColumn']:first-child iframe,
+      div[data-testid='stHorizontalBlock'] > div[data-testid='stColumn']:first-child [data-testid='stIFrame'],
+      div[data-testid='stHorizontalBlock'] > div[data-testid='stColumn']:first-child [data-testid='stCustomComponentV1'],
+      div[data-testid='stHorizontalBlock'] > div[data-testid='stColumn']:first-child [class*='Component'],
+      div[data-testid='stHorizontalBlock'] > div[data-testid='stColumn']:first-child [title^='streamlit_folium'] {
+        height: 100vh !important; width: 100% !important; display: block !important;
+        border: 0 !important; min-height: 100vh !important;
+      }
+      /* Right column: scroll internally */
+      div[data-testid='stHorizontalBlock'] > div[data-testid='stColumn']:last-child {
+        overflow-y: auto !important;
+        padding: 1.5rem 1.75rem !important;
+      }
+    }
+    /* Mobile: no scroll anywhere, upload on top (compact), map filling remaining viewport */
+    @media (max-width: 640px) {
+      html, body {overflow: hidden !important; height: 100vh !important; margin: 0 !important; padding: 0 !important;}
+      [data-testid='stApp'], [data-testid='stAppViewContainer'],
+      [data-testid='stMain'], .stMain, section.main {
+        overflow: hidden !important; height: 100vh !important; max-height: 100vh !important;
+      }
+      header[data-testid='stHeader'], [data-testid='stToolbar'], footer {display: none !important;}
+
+      [data-testid='stMainBlockContainer'], section.main > div.block-container,
+      .block-container, div.block-container {
+        padding: 0.5rem !important; margin: 0 !important;
+        max-width: 100% !important; width: 100% !important;
+        height: 100vh !important; max-height: 100vh !important;
+        overflow: hidden !important;
+      }
+
+      /* Compact typography and killed vertical gaps in the upload panel */
+      h1 {font-size: 1.35rem !important; line-height: 1.2 !important; margin: 0 0 0.4rem 0 !important; padding: 0 !important;}
+      [data-testid='stHeading'], [data-testid='stMarkdownContainer'] {margin: 0 !important; padding: 0 !important; display: block !important; position: static !important;}
+      h1, h2, h3 {display: block !important; position: static !important;}
+      [data-testid='stCaptionContainer'], .stCaption, small {
+        margin: 0 !important; padding: 0 !important; line-height: 1.3 !important; font-size: 0.8rem !important; display: block !important;
+      }
+      [data-testid='stAlert'] {padding: 0.35rem 0.5rem !important; margin: 0.2rem 0 !important;}
+      [data-testid='stFileUploader'] label {font-size: 0.8rem !important; margin-bottom: 0.15rem !important;}
+      [data-testid='stFileUploaderDropzone'] {padding: 0.4rem 0.6rem !important; min-height: 0 !important;}
+      /* Kill default 1rem gaps in vertical blocks on mobile */
+      div[data-testid='stHorizontalBlock'] > div[data-testid='stColumn']:last-child div[data-testid='stVerticalBlock'] {
+        gap: 0.25rem !important;
+      }
+      div[data-testid='stHorizontalBlock'] > div[data-testid='stColumn']:last-child [data-testid='stElementContainer'] {
+        margin: 0 !important;
+      }
+
+      /* Horizontal block becomes a column: upload (last child) stacks on top, map (first child) below */
+      div[data-testid='stHorizontalBlock'] {
+        display: flex !important;
+        flex-direction: column-reverse !important;
+        height: calc(100vh - 1rem) !important;
+        max-height: calc(100vh - 1rem) !important;
+        gap: 0.35rem !important;
+        margin: 0 !important;
+      }
+      /* Upload column: natural height, no scroll unless very tall */
+      div[data-testid='stHorizontalBlock'] > div[data-testid='stColumn']:last-child {
+        flex: 0 0 auto !important;
+        width: 100% !important;
+        padding: 0 !important;
+        max-height: 55vh !important;
+        overflow-y: auto !important;
+      }
+      /* Map column: force explicit viewport-based height (flex propagation unreliable through streamlit wrappers) */
+      div[data-testid='stHorizontalBlock'] > div[data-testid='stColumn']:first-child {
+        flex: 1 1 auto !important;
+        width: 100% !important;
+        padding: 0 !important;
+        overflow: hidden !important;
+      }
+      div[data-testid='stHorizontalBlock'] > div[data-testid='stColumn']:first-child > div[data-testid='stVerticalBlock'],
+      div[data-testid='stHorizontalBlock'] > div[data-testid='stColumn']:first-child [data-testid='stElementContainer'],
+      div[data-testid='stHorizontalBlock'] > div[data-testid='stColumn']:first-child [data-testid='stVerticalBlockBorderWrapper'] {
+        padding: 0 !important; gap: 0 !important; margin: 0 !important;
+      }
+      div[data-testid='stHorizontalBlock'] > div[data-testid='stColumn']:first-child iframe,
+      div[data-testid='stHorizontalBlock'] > div[data-testid='stColumn']:first-child [data-testid='stIFrame'],
+      div[data-testid='stHorizontalBlock'] > div[data-testid='stColumn']:first-child [data-testid='stCustomComponentV1'] {
+        height: calc(100vh - 255px) !important;
+        min-height: 280px !important;
+        width: 100% !important;
+        display: block !important;
+        border: 0 !important;
+      }
+    }
+    </style>
+    """,
+    unsafe_allow_html=True,
+)
+
+left, right = st.columns([7, 3], gap="large")
+
+with right:
+    st.title("TrashAI")
+    st.caption("Snap a photo of anything needing civic action in NYC. We'll tell you exactly where and how to report it.")
+    if is_stub_mode():
+        st.warning("⚙️ Stub mode: Claude Vision is disabled. Add your API key to `.streamlit/secrets.toml` to enable real classification.")
+    pin_count = len(load_pins())
+    st.caption(f"📍 {pin_count} pinned on the map")
+    uploaded = st.file_uploader("Upload a photo", type=["jpg", "jpeg", "png"])
+    st.markdown("<p style='font-size:0.75rem;font-style:italic;font-weight:600;color:#888;text-align:center;margin-top:2px'>AI can make mistakes.<br>Always verify the category and instructions before filing a report.</p>", unsafe_allow_html=True)
+
+    if uploaded:
+        image_bytes = uploaded.getvalue()
+        media_type = uploaded.type or "image/jpeg"
+        st.image(image_bytes, use_container_width=True)
+
+        lat, lng = None, None
+        gps = get_location_from_exif(image_bytes)
+        if gps:
+            lat, lng = gps
+            st.success(f"📍 {lat:.5f}, {lng:.5f}")
+        else:
+            st.info("No GPS in photo — enter a location.")
+            address = st.text_input("Address or intersection", placeholder="199 Chambers St, New York, NY")
+            if address:
+                coords = geocode_address(address)
+                if coords:
+                    lat, lng = coords
+                    st.success(f"📍 {lat:.5f}, {lng:.5f}")
+                else:
+                    st.error("Couldn't find that address. Try adding the borough or zip.")
+
+        if lat is not None and st.button("Classify & add to map", type="primary", use_container_width=True):
+            with st.spinner("Classifying with Claude Vision..."):
+                result = classify_image(image_bytes, media_type=media_type)
+            guide = get_guide(result["category"])
+            save_pin(
+                lat=lat,
+                lng=lng,
+                category=result["category"],
+                display_name=guide["display_name"],
+                image_bytes=image_bytes,
+                reasoning=result.get("reasoning", ""),
+                notable_details=result.get("notable_details", ""),
+                confidence=result.get("confidence", ""),
+            )
+            st.session_state.last_result = (result, guide)
+            st.rerun()
+
+    if st.session_state.last_result:
+        result, guide = st.session_state.last_result
+        st.divider()
+        st.subheader(f"How to report: {guide['display_name']}")
+        st.markdown(f"**Detected:** `{result['category']}` · {result['confidence']}")
+        if result.get("reasoning"):
+            st.caption(result["reasoning"])
+        st.markdown(f"**Agency:** {guide['agency']}")
+        st.markdown(f"**Channel:** {guide['channel']}")
+        st.markdown(f"**Select:** _{guide['service_type']}_")
+        st.markdown(f"**What to do:** {guide['instructions']}")
+        if result.get("notable_details"):
+            st.info(f"Include: {result['notable_details']}")
+        if guide.get("link"):
+            st.link_button("Open reporting page", guide["link"], use_container_width=True)
+
+with left:
     pins = load_pins()
     m = folium.Map(location=NYC_CENTER, zoom_start=11, tiles="cartodbpositron")
     m.get_root().header.add_child(folium.Element(
@@ -107,550 +315,4 @@ def _build_folium_map() -> folium.Map:
             popup=folium.Popup(popup_html, max_width=280),
             tooltip=pin["display_name"],
         ).add_to(m)
-    return m
-
-
-def _render_upload_panel(key_prefix: str) -> None:
-    st.title("TrashAI")
-    st.caption("Snap a photo of anything needing civic action in NYC. We'll tell you exactly where and how to report it.")
-    if is_stub_mode():
-        st.warning("⚙️ Stub mode: Claude Vision is disabled. Add your API key to `.streamlit/secrets.toml` to enable real classification.")
-    pin_count = len(load_pins())
-    st.caption(f"📍 {pin_count} pinned on the map")
-
-    uploaded = st.file_uploader(
-        "Upload a photo",
-        type=["jpg", "jpeg", "png"],
-        key=f"{key_prefix}_file",
-    )
-
-    if uploaded:
-        image_bytes = uploaded.getvalue()
-        media_type = uploaded.type or "image/jpeg"
-        st.image(image_bytes, use_container_width=True)
-
-        lat, lng = None, None
-        gps = get_location_from_exif(image_bytes)
-        if gps:
-            lat, lng = gps
-            st.success(f"📍 {lat:.5f}, {lng:.5f}")
-        else:
-            st.info("No GPS in photo — enter a location.")
-            address = st.text_input(
-                "Address or intersection",
-                placeholder="199 Chambers St, New York, NY",
-                key=f"{key_prefix}_address",
-            )
-            if address:
-                coords = geocode_address(address)
-                if coords:
-                    lat, lng = coords
-                    st.success(f"📍 {lat:.5f}, {lng:.5f}")
-                else:
-                    st.error("Couldn't find that address. Try adding the borough or zip.")
-
-        if lat is not None and st.button(
-            "Classify & add to map",
-            type="primary",
-            use_container_width=True,
-            key=f"{key_prefix}_classify",
-        ):
-            with st.spinner("Classifying with Claude Vision..."):
-                result = classify_image(image_bytes, media_type=media_type)
-            if result["category"] == "other":
-                st.warning(
-                    "🚫 This doesn't look like trash or a reportable NYC civic issue. "
-                    "Nothing was saved or added to the map."
-                )
-                if result.get("reasoning"):
-                    st.caption(result["reasoning"])
-            else:
-                guide = get_guide(result["category"])
-                save_pin(
-                    lat=lat,
-                    lng=lng,
-                    category=result["category"],
-                    display_name=guide["display_name"],
-                    image_bytes=image_bytes,
-                    reasoning=result.get("reasoning", ""),
-                    notable_details=result.get("notable_details", ""),
-                    confidence=result.get("confidence", ""),
-                )
-                st.session_state.last_result = (result, guide)
-                st.rerun()
-
-    if st.session_state.last_result:
-        result, guide = st.session_state.last_result
-        st.divider()
-        st.subheader(f"How to report: {guide['display_name']}")
-        st.markdown(f"**Detected:** `{result['category']}` · {result['confidence']}")
-        if result.get("reasoning"):
-            st.caption(result["reasoning"])
-        st.markdown(f"**Agency:** {guide['agency']}")
-        st.markdown(f"**Channel:** {guide['channel']}")
-        st.markdown(f"**Select:** _{guide['service_type']}_")
-        st.markdown(f"**What to do:** {guide['instructions']}")
-        if result.get("notable_details"):
-            st.info(f"Include: {result['notable_details']}")
-        if guide.get("link"):
-            st.link_button("Open reporting page", guide["link"], use_container_width=True)
-
-
-def _render_desktop_layout() -> None:
-    left, right = st.columns([7, 3], gap="large")
-    with right:
-        _render_upload_panel(key_prefix="d")
-    with left:
-        st_folium(_build_folium_map(), width=None, height=1200, returned_objects=[], key="d_map")
-
-
-def _render_mobile_panel() -> None:
-    """Dense mobile upload/result panel. Uses horizontal columns aggressively — never stacks
-    content vertically when 2-col side-by-side fits. Never scrolls; the parent is capped at 50vh.
-    """
-    pin_count = len(load_pins())
-    has_result = st.session_state.last_result is not None
-
-    # Header row — title + pin count inline (leaves right half empty when no result)
-    hdr = st.columns([3, 2])
-    with hdr[0]:
-        st.markdown("<div class='tai-m-title'>TrashAI</div>", unsafe_allow_html=True)
-    with hdr[1]:
-        st.markdown(
-            f"<div class='tai-m-pins'>📍 {pin_count} pinned</div>",
-            unsafe_allow_html=True,
-        )
-
-    if is_stub_mode() and not has_result:
-        st.caption("⚙️ Stub mode — add API key for real classification")
-
-    uploaded = st.file_uploader(
-        "Upload",
-        type=["jpg", "jpeg", "png"],
-        key="m_file",
-        label_visibility="collapsed",
-    )
-
-    # Pristine-state marker: no file and no result. CSS :has() uses this to shrink the
-    # panel so the map fills more of the screen on the very initial page load.
-    if uploaded is None and not has_result:
-        st.markdown(
-            "<div data-tai-pristine='1' style='display:none'></div>",
-            unsafe_allow_html=True,
-        )
-
-    if uploaded:
-        image_bytes = uploaded.getvalue()
-        media_type = uploaded.type or "image/jpeg"
-
-        lat, lng = None, None
-        gps = get_location_from_exif(image_bytes)
-
-        img_col, info_col = st.columns([1, 3])
-        with img_col:
-            st.image(image_bytes, width=64)
-        with info_col:
-            if gps:
-                lat, lng = gps
-                st.success(f"📍 {lat:.4f}, {lng:.4f}")
-            else:
-                address = st.text_input(
-                    "Address",
-                    placeholder="199 Chambers St, NY",
-                    key="m_addr",
-                    label_visibility="collapsed",
-                )
-                if address:
-                    coords = geocode_address(address)
-                    if coords:
-                        lat, lng = coords
-                        st.caption(f"📍 {lat:.4f}, {lng:.4f}")
-                    else:
-                        st.caption("⚠️ Not found. Add borough or zip.")
-
-        if lat is not None and st.button(
-            "Classify & add to map",
-            type="primary",
-            use_container_width=True,
-            key="m_classify",
-        ):
-            with st.spinner("Classifying..."):
-                result = classify_image(image_bytes, media_type=media_type)
-            if result["category"] == "other":
-                st.warning("🚫 Not a reportable NYC issue. Not saved.")
-                if result.get("reasoning"):
-                    st.caption(result["reasoning"])
-            else:
-                guide = get_guide(result["category"])
-                save_pin(
-                    lat=lat,
-                    lng=lng,
-                    category=result["category"],
-                    display_name=guide["display_name"],
-                    image_bytes=image_bytes,
-                    reasoning=result.get("reasoning", ""),
-                    notable_details=result.get("notable_details", ""),
-                    confidence=result.get("confidence", ""),
-                )
-                st.session_state.last_result = (result, guide)
-                st.rerun()
-
-    if has_result:
-        result, guide = st.session_state.last_result
-        # Result title + Open-report button on same row (right half uses the "dead space")
-        rhdr = st.columns([3, 2])
-        with rhdr[0]:
-            st.markdown(
-                f"<div class='tai-m-restitle'>{html.escape(guide['display_name'])}</div>",
-                unsafe_allow_html=True,
-            )
-        with rhdr[1]:
-            if guide.get("link"):
-                st.link_button("Open report", guide["link"], use_container_width=True)
-
-        # Dense info row: agency/channel on left, service type on right
-        meta = st.columns([3, 2])
-        with meta[0]:
-            st.markdown(
-                f"<div class='tai-m-meta'><b>{html.escape(guide['agency'])}</b> · {html.escape(guide['channel'])}</div>",
-                unsafe_allow_html=True,
-            )
-        with meta[1]:
-            st.markdown(
-                f"<div class='tai-m-meta tai-m-svc'><i>{html.escape(guide['service_type'])}</i></div>",
-                unsafe_allow_html=True,
-            )
-
-        st.markdown(
-            f"<div class='tai-m-instr'>{html.escape(guide['instructions'])}</div>",
-            unsafe_allow_html=True,
-        )
-        if result.get("notable_details"):
-            st.markdown(
-                f"<div class='tai-m-notes'>ℹ️ {html.escape(result['notable_details'])}</div>",
-                unsafe_allow_html=True,
-            )
-
-
-def _render_mobile_layout() -> None:
-    with st.container(key="mobile-panel"):
-        _render_mobile_panel()
-    st_folium(_build_folium_map(), width=None, height=600, returned_objects=[], key="m_map")
-
-
-st.set_page_config(page_title="TrashAI", page_icon="📍", layout="wide")
-
-if "last_result" not in st.session_state:
-    st.session_state.last_result = None
-
-st.markdown(
-    """
-    <style>
-    /* --- Global resets shared by both layouts --- */
-    [data-testid='stFileUploaderDropzoneInstructions'] small,
-    [data-testid='stFileUploaderDropzoneInstructions'] span:last-child,
-    [data-testid='stFileDropzoneInstructions'] small,
-    [data-testid='stFileUploaderDropzone'] small {display:none !important;}
-
-    html, body {overflow: hidden !important; height: 100vh !important; margin: 0 !important; padding: 0 !important;}
-    [data-testid='stApp'], [data-testid='stAppViewContainer'],
-    [data-testid='stMain'], .stMain, section.main {
-      overflow: hidden !important; height: 100vh !important; max-height: 100vh !important;
-    }
-    header[data-testid='stHeader'], [data-testid='stToolbar'], footer {display: none !important;}
-    [data-testid='stMainBlockContainer'], section.main > div.block-container,
-    .block-container, div.block-container {
-      padding: 0 !important; margin: 0 !important;
-      max-width: 100% !important; width: 100% !important;
-      height: 100vh !important; max-height: 100vh !important;
-      overflow: hidden !important;
-    }
-
-    /* --- Only one root renders per viewport --- */
-    @media (min-width: 641px) { .st-key-mobile-root {display: none !important;} }
-    @media (max-width: 640px) { .st-key-desktop-root {display: none !important;} }
-    .st-key-desktop-root, .st-key-mobile-root {height: 100vh !important; width: 100% !important;}
-
-    /* =========================================================
-       DESKTOP LAYOUT (scoped to .st-key-desktop-root)
-       ========================================================= */
-    @media (min-width: 641px) {
-      .st-key-desktop-root div[data-testid='stHorizontalBlock'] {
-        gap: 0 !important;
-        height: 100vh !important; min-height: 100vh !important;
-        margin: 0 !important;
-      }
-      .st-key-desktop-root div[data-testid='stHorizontalBlock'] > div[data-testid='stColumn'] {
-        height: 100vh !important; max-height: 100vh !important;
-      }
-      /* Left column (map): no padding, fill */
-      .st-key-desktop-root div[data-testid='stHorizontalBlock'] > div[data-testid='stColumn']:first-child,
-      .st-key-desktop-root div[data-testid='stHorizontalBlock'] > div[data-testid='stColumn']:first-child > div[data-testid='stVerticalBlock'],
-      .st-key-desktop-root div[data-testid='stHorizontalBlock'] > div[data-testid='stColumn']:first-child [data-testid='stElementContainer'],
-      .st-key-desktop-root div[data-testid='stHorizontalBlock'] > div[data-testid='stColumn']:first-child [data-testid='stVerticalBlockBorderWrapper'] {
-        padding: 0 !important; gap: 0 !important; height: 100vh !important;
-      }
-      /* Map iframe fills full viewport */
-      .st-key-desktop-root div[data-testid='stHorizontalBlock'] > div[data-testid='stColumn']:first-child iframe,
-      .st-key-desktop-root div[data-testid='stHorizontalBlock'] > div[data-testid='stColumn']:first-child [data-testid='stIFrame'],
-      .st-key-desktop-root div[data-testid='stHorizontalBlock'] > div[data-testid='stColumn']:first-child [data-testid='stCustomComponentV1'],
-      .st-key-desktop-root div[data-testid='stHorizontalBlock'] > div[data-testid='stColumn']:first-child [class*='Component'],
-      .st-key-desktop-root div[data-testid='stHorizontalBlock'] > div[data-testid='stColumn']:first-child [title^='streamlit_folium'] {
-        height: 100vh !important; width: 100% !important; display: block !important;
-        border: 0 !important; min-height: 100vh !important;
-      }
-      /* Right column: scroll internally */
-      .st-key-desktop-root div[data-testid='stHorizontalBlock'] > div[data-testid='stColumn']:last-child {
-        overflow-y: auto !important;
-        padding: 1.5rem 1.75rem !important;
-      }
-    }
-
-    /* =========================================================
-       MOBILE LAYOUT (scoped to .st-key-mobile-root)
-       Dynamic split: panel grows from min 30vh up to max 50vh as content is added.
-       Map always fills remaining space (always >= 50vh, up to 70vh when panel is minimal).
-       Panel uses horizontal columns aggressively; Streamlit's default mobile-stacking is overridden.
-       ========================================================= */
-    @media (max-width: 640px) {
-      .st-key-mobile-root {
-        display: flex !important;
-        flex-direction: column !important;
-        height: 100vh !important; max-height: 100vh !important;
-        width: 100% !important;
-        padding: 0 !important;
-        margin: 0 !important;
-        box-sizing: border-box !important;
-        overflow: hidden !important;
-      }
-      /* Inner stVerticalBlock = flex column holding (panel, map). */
-      .st-key-mobile-root > div[data-testid='stVerticalBlockBorderWrapper'] {
-        height: 100vh !important; max-height: 100vh !important;
-        width: 100% !important;
-      }
-      .st-key-mobile-root > div[data-testid='stVerticalBlockBorderWrapper'] > div[data-testid='stVerticalBlock'] {
-        display: flex !important;
-        flex-direction: column !important;
-        height: 100vh !important; max-height: 100vh !important;
-        width: 100% !important;
-        gap: 0 !important;
-        padding: 0 !important;
-        overflow: hidden !important;
-      }
-
-      /* --- Panel: non-pristine = 50vh (fixed), pristine = 12vh (fixed).
-         Fixed heights so the map's explicit vh heights never overlap or leave gaps. --- */
-      .st-key-mobile-panel {
-        flex: 0 0 50vh !important;
-        height: 50vh !important; max-height: 50vh !important;
-        width: 100% !important;
-        padding: 0.5rem !important;
-        box-sizing: border-box !important;
-        overflow: hidden !important;
-      }
-      .st-key-mobile-panel:has([data-tai-pristine]) {
-        flex: 0 0 12vh !important;
-        height: 12vh !important; max-height: 12vh !important;
-      }
-      .st-key-mobile-panel > div[data-testid='stVerticalBlock'] {
-        gap: 0.35rem !important;
-        height: 100% !important;
-      }
-
-      /* --- Map: explicit viewport heights, no cascade dependency. --- */
-      /* Default (non-pristine): map = 50vh */
-      .st-key-mobile-root [data-testid='stElementContainer']:has(iframe[title^='streamlit_folium']),
-      .st-key-mobile-root [data-testid='stElementContainer']:has([data-testid='stCustomComponentV1']) {
-        flex: 0 0 50vh !important;
-        height: 50vh !important; min-height: 50vh !important; max-height: 50vh !important;
-        width: 100% !important;
-        display: block !important;
-        overflow: hidden !important;
-        margin: 0 !important; padding: 0 !important;
-      }
-      .st-key-mobile-root [data-testid='stElementContainer']:has(iframe[title^='streamlit_folium']) iframe,
-      .st-key-mobile-root [data-testid='stElementContainer']:has([data-testid='stCustomComponentV1']) iframe,
-      .st-key-mobile-root [data-testid='stElementContainer']:has([data-testid='stCustomComponentV1']) [data-testid='stCustomComponentV1'],
-      .st-key-mobile-root [data-testid='stElementContainer']:has([data-testid='stCustomComponentV1']) [data-testid='stIFrame'] {
-        height: 50vh !important; min-height: 50vh !important; max-height: 50vh !important;
-        width: 100% !important;
-        display: block !important;
-        border: 0 !important;
-      }
-
-      /* Pristine: map = 88vh (takes whatever's left after the 12vh panel) */
-      .st-key-mobile-root:has([data-tai-pristine]) [data-testid='stElementContainer']:has(iframe[title^='streamlit_folium']),
-      .st-key-mobile-root:has([data-tai-pristine]) [data-testid='stElementContainer']:has([data-testid='stCustomComponentV1']) {
-        flex: 0 0 88vh !important;
-        height: 88vh !important; min-height: 88vh !important; max-height: 88vh !important;
-      }
-      .st-key-mobile-root:has([data-tai-pristine]) [data-testid='stElementContainer']:has(iframe[title^='streamlit_folium']) iframe,
-      .st-key-mobile-root:has([data-tai-pristine]) [data-testid='stElementContainer']:has([data-testid='stCustomComponentV1']) iframe,
-      .st-key-mobile-root:has([data-tai-pristine]) [data-testid='stElementContainer']:has([data-testid='stCustomComponentV1']) [data-testid='stCustomComponentV1'],
-      .st-key-mobile-root:has([data-tai-pristine]) [data-testid='stElementContainer']:has([data-testid='stCustomComponentV1']) [data-testid='stIFrame'] {
-        height: 88vh !important; min-height: 88vh !important; max-height: 88vh !important;
-      }
-
-      /* :has() fallback (older browsers) — skip pristine shrink, keep 50/50 */
-      @supports not selector(:has(*)) {
-        .st-key-mobile-panel {height: 50vh !important; max-height: 50vh !important;}
-        .st-key-mobile-root iframe[title^='streamlit_folium'],
-        .st-key-mobile-root [data-testid='stCustomComponentV1'],
-        .st-key-mobile-root [data-testid='stIFrame'] {
-          height: 50vh !important; min-height: 50vh !important;
-          width: 100% !important; display: block !important; border: 0 !important;
-        }
-      }
-
-      /* --- CRITICAL: force st.columns to stay horizontal on mobile.
-         Streamlit's default CSS stacks columns at narrow widths; we override it here so our 2-col
-         dense layouts (title|pin, thumb|address, result-title|link-button, agency|service-type)
-         actually render side-by-side. --- */
-      .st-key-mobile-panel div[data-testid='stHorizontalBlock'] {
-        display: flex !important;
-        flex-direction: row !important;
-        flex-wrap: nowrap !important;
-        gap: 0.5rem !important;
-        margin: 0 !important;
-        width: 100% !important;
-      }
-      .st-key-mobile-panel div[data-testid='stHorizontalBlock'] > div[data-testid='stColumn'] {
-        min-width: 0 !important;
-        padding: 0 !important;
-      }
-
-      /* Element container margins zeroed */
-      .st-key-mobile-panel [data-testid='stElementContainer'] {margin: 0 !important;}
-
-      /* Custom header classes */
-      .st-key-mobile-root .tai-m-title {
-        font-size: 1.2rem; font-weight: 700; line-height: 1.15; margin: 0; padding: 0;
-      }
-      .st-key-mobile-root .tai-m-pins {
-        font-size: 0.78rem; line-height: 1.15; text-align: right; opacity: 0.85;
-        padding-top: 0.35rem;
-      }
-      .st-key-mobile-root .tai-m-restitle {
-        font-size: 1rem; font-weight: 700; line-height: 1.2; margin: 0; padding-top: 0.3rem;
-      }
-      .st-key-mobile-root .tai-m-meta {
-        font-size: 0.75rem; line-height: 1.25; margin: 0;
-      }
-      .st-key-mobile-root .tai-m-svc {text-align: right;}
-      .st-key-mobile-root .tai-m-instr {
-        font-size: 0.75rem; line-height: 1.3; margin: 0.15rem 0 0 0; opacity: 0.92;
-      }
-      .st-key-mobile-root .tai-m-notes {
-        font-size: 0.7rem; line-height: 1.25; margin: 0.15rem 0 0 0; opacity: 0.75;
-      }
-
-      /* Heading/markdown resets */
-      .st-key-mobile-root h1, .st-key-mobile-root h2, .st-key-mobile-root h3 {
-        display: block !important; position: static !important;
-      }
-      .st-key-mobile-root [data-testid='stHeading'],
-      .st-key-mobile-root [data-testid='stMarkdownContainer'] {
-        margin: 0 !important; padding: 0 !important; display: block !important; position: static !important;
-      }
-      .st-key-mobile-root [data-testid='stCaptionContainer'],
-      .st-key-mobile-root .stCaption,
-      .st-key-mobile-root small {
-        margin: 0 !important; padding: 0 !important; line-height: 1.2 !important; font-size: 0.72rem !important;
-      }
-      .st-key-mobile-root [data-testid='stAlert'] {
-        padding: 0.25rem 0.45rem !important; margin: 0 !important; font-size: 0.75rem !important;
-      }
-
-      /* File uploader: compact; hide the dropzone instructions once a file is uploaded to save ~60px */
-      .st-key-mobile-root [data-testid='stFileUploader'] {
-        margin: 0 !important;
-        width: 100% !important;
-        max-width: 100% !important;
-        overflow: hidden !important;
-      }
-      .st-key-mobile-root [data-testid='stFileUploaderDropzone'] {
-        padding: 0.5rem 0.75rem !important;
-        min-height: 0 !important;
-        display: flex !important;
-        flex-direction: row !important;
-        flex-wrap: nowrap !important;
-        justify-content: center !important;
-        align-items: center !important;
-        width: 100% !important;
-        max-width: 100% !important;
-        box-sizing: border-box !important;
-        overflow: hidden !important;
-      }
-      /* Inner section/div: center within parent; let widths flow naturally so nothing overflows */
-      .st-key-mobile-root [data-testid='stFileUploaderDropzone'] > section,
-      .st-key-mobile-root [data-testid='stFileUploaderDropzone'] > div {
-        display: flex !important;
-        flex-direction: row !important;
-        justify-content: center !important;
-        align-items: center !important;
-        max-width: 100% !important;
-        min-width: 0 !important;
-        flex: 0 1 auto !important;
-        gap: 0.5rem !important;
-      }
-      .st-key-mobile-root [data-testid='stFileUploaderDropzoneInstructions'] {
-        padding: 0 !important;
-        margin: 0 !important;
-        flex: 0 1 auto !important;
-        min-width: 0 !important;
-        max-width: 100% !important;
-      }
-      /* Browse files button — keep inside the dropzone bounds */
-      .st-key-mobile-root [data-testid='stFileUploaderDropzone'] button {
-        flex: 0 0 auto !important;
-        max-width: 100% !important;
-        min-width: 0 !important;
-        white-space: nowrap !important;
-      }
-      .st-key-mobile-root [data-testid='stFileUploaderFile'] {
-        padding: 0.15rem 0.3rem !important; font-size: 0.72rem !important;
-      }
-      .st-key-mobile-root [data-testid='stFileUploader']:has([data-testid='stFileUploaderFile']) [data-testid='stFileUploaderDropzone'] {
-        display: none !important;
-      }
-
-      /* Form controls — flat, tight */
-      .st-key-mobile-root [data-testid='stTextInput'] input {
-        padding: 0.2rem 0.5rem !important; font-size: 0.78rem !important; height: 1.8rem !important; min-height: 0 !important;
-      }
-      .st-key-mobile-root [data-testid='stButton'] button {
-        padding: 0.2rem 0.5rem !important; font-size: 0.8rem !important; min-height: 0 !important; height: 1.9rem !important;
-      }
-      .st-key-mobile-root [data-testid='stLinkButton'] a {
-        padding: 0.2rem 0.4rem !important; font-size: 0.75rem !important; min-height: 0 !important; height: 1.8rem !important;
-        display: inline-flex !important; align-items: center !important; justify-content: center !important;
-      }
-
-      /* Thumbnail (64px) inside the upload row */
-      .st-key-mobile-root [data-testid='stImage'],
-      .st-key-mobile-root [data-testid='stImage'] > div,
-      .st-key-mobile-root [data-testid='stImage'] figure {
-        width: 64px !important; max-width: 64px !important; min-width: 0 !important;
-        margin: 0 !important; padding: 0 !important; display: block !important;
-      }
-      .st-key-mobile-root [data-testid='stImage'] img {
-        width: 64px !important; height: 64px !important;
-        max-width: 64px !important; max-height: 64px !important;
-        object-fit: cover !important; border-radius: 6px !important; display: block !important;
-      }
-
-      /* Safety: no element in the panel may overflow horizontally */
-      .st-key-mobile-panel [data-testid='stElementContainer'] {
-        max-width: 100% !important; box-sizing: border-box !important;
-      }
-    }
-    </style>
-    """,
-    unsafe_allow_html=True,
-)
-
-with st.container(key="desktop-root"):
-    _render_desktop_layout()
-
-with st.container(key="mobile-root"):
-    _render_mobile_layout()
+    st_folium(m, width=None, height=1200, returned_objects=[])
