@@ -115,75 +115,67 @@ st.markdown(
         gap: 0.5rem !important;
       }
     }
-    /* Mobile: no scroll anywhere, upload on top (compact), map filling remaining viewport */
-    @media (max-width: 640px) {
-      html, body {overflow: hidden !important; height: 100vh !important; margin: 0 !important; padding: 0 !important;}
+    /* Mobile: stack panel on top, map below — breakpoint raised to 900px for safety */
+    @media (max-width: 900px) {
+      html, body {overflow: hidden !important; height: 100vh !important; margin: 0 !important; padding: 0 !important; overflow-x: hidden !important;}
       [data-testid='stApp'], [data-testid='stAppViewContainer'],
       [data-testid='stMain'], .stMain, section.main {
         overflow: hidden !important; height: 100vh !important; max-height: 100vh !important;
       }
       header[data-testid='stHeader'], [data-testid='stToolbar'], footer {display: none !important;}
-
       [data-testid='stMainBlockContainer'], section.main > div.block-container,
       .block-container, div.block-container {
-        padding: 0.5rem !important; margin: 0 !important;
-        max-width: 100% !important; width: 100% !important;
-        height: 100vh !important; max-height: 100vh !important;
-        overflow: hidden !important;
+        padding: 0 !important; margin: 0 !important;
+        max-width: 100vw !important; width: 100% !important;
+        height: 100vh !important; overflow: hidden !important;
       }
 
-      /* Compact typography and killed vertical gaps in the upload panel */
-      h1 {font-size: 1.35rem !important; line-height: 1.2 !important; margin: 0 0 0.4rem 0 !important; padding: 0 !important;}
-      [data-testid='stHeading'], [data-testid='stMarkdownContainer'] {margin: 0 !important; padding: 0 !important; display: block !important; position: static !important;}
-      h1, h2, h3 {display: block !important; position: static !important;}
-      [data-testid='stCaptionContainer'], .stCaption, small {
-        margin: 0 !important; padding: 0 !important; line-height: 1.3 !important; font-size: 0.8rem !important; display: block !important;
-      }
-      [data-testid='stAlert'] {padding: 0.35rem 0.5rem !important; margin: 0.2rem 0 !important;}
-      [data-testid='stFileUploader'] label {font-size: 0.8rem !important; margin-bottom: 0.15rem !important;}
-      [data-testid='stFileUploaderDropzone'] {padding: 0.4rem 0.6rem !important; min-height: 0 !important;}
-      /* Kill default 1rem gaps in vertical blocks on mobile */
-      div[data-testid='stHorizontalBlock'] > div[data-testid='stColumn']:last-child div[data-testid='stVerticalBlock'] {
-        gap: 0.25rem !important;
-      }
-      div[data-testid='stHorizontalBlock'] > div[data-testid='stColumn']:last-child [data-testid='stElementContainer'] {
-        margin: 0 !important;
-      }
-
-      /* Horizontal block becomes a column: upload (last child) stacks on top, map (first child) below */
+      /* Stack columns vertically: panel (last) on top, map (first) below */
       div[data-testid='stHorizontalBlock'] {
         display: flex !important;
         flex-direction: column-reverse !important;
-        height: calc(100vh - 1rem) !important;
-        max-height: calc(100vh - 1rem) !important;
-        gap: 0.35rem !important;
+        height: 100vh !important;
+        width: 100% !important;
+        max-width: 100vw !important;
+        gap: 0 !important;
         margin: 0 !important;
+        overflow-x: hidden !important;
       }
-      /* Upload column: natural height, no scroll unless very tall */
+
+      /* Force both columns full width when stacked */
+      div[data-testid='stHorizontalBlock'] > div[data-testid='stColumn'] {
+        width: 100% !important;
+        min-width: 100% !important;
+        max-width: 100vw !important;
+        flex: none !important;
+      }
+
+      /* Panel: fixed height, scrollable internally, compact padding */
       div[data-testid='stHorizontalBlock'] > div[data-testid='stColumn']:last-child {
-        flex: 0 0 auto !important;
-        width: 100% !important;
-        padding: 0 !important;
-        max-height: 55vh !important;
+        height: 45vh !important;
+        max-height: 45vh !important;
         overflow-y: auto !important;
+        padding: 0.75rem 1rem !important;
       }
-      /* Map column: force explicit viewport-based height (flex propagation unreliable through streamlit wrappers) */
+      div[data-testid='stHorizontalBlock'] > div[data-testid='stColumn']:last-child div[data-testid='stVerticalBlock'] {
+        gap: 0.35rem !important;
+      }
+
+      /* Map: fills remaining 55vh */
       div[data-testid='stHorizontalBlock'] > div[data-testid='stColumn']:first-child {
-        flex: 1 1 auto !important;
-        width: 100% !important;
+        height: 55vh !important;
         padding: 0 !important;
         overflow: hidden !important;
       }
       div[data-testid='stHorizontalBlock'] > div[data-testid='stColumn']:first-child > div[data-testid='stVerticalBlock'],
       div[data-testid='stHorizontalBlock'] > div[data-testid='stColumn']:first-child [data-testid='stElementContainer'],
       div[data-testid='stHorizontalBlock'] > div[data-testid='stColumn']:first-child [data-testid='stVerticalBlockBorderWrapper'] {
-        padding: 0 !important; gap: 0 !important; margin: 0 !important;
+        padding: 0 !important; gap: 0 !important; margin: 0 !important; height: 100% !important;
       }
       div[data-testid='stHorizontalBlock'] > div[data-testid='stColumn']:first-child iframe,
       div[data-testid='stHorizontalBlock'] > div[data-testid='stColumn']:first-child [data-testid='stIFrame'],
       div[data-testid='stHorizontalBlock'] > div[data-testid='stColumn']:first-child [data-testid='stCustomComponentV1'] {
-        height: calc(100vh - 255px) !important;
-        min-height: 280px !important;
+        height: 55vh !important;
         width: 100% !important;
         display: block !important;
         border: 0 !important;
