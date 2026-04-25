@@ -3,4 +3,5 @@ anthropic>=0.45
 Pillow>=11.0
 folium>=0.17
 streamlit-folium>=0.22
+streamlit-js-eval>=0.1.7
 geopy>=2.4

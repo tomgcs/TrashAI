@@ -6,6 +6,7 @@ import folium
 import streamlit as st
 from PIL import Image, ImageOps
 from streamlit_folium import st_folium
+from streamlit_js_eval import get_geolocation
 
 from classify import classify_image, is_stub_mode
 from groups import join_group, load_groups, save_group
@@ -220,15 +221,29 @@ with right:
                 lat, lng = gps
                 st.success(f"📍 {lat:.5f}, {lng:.5f}")
             else:
-                st.info("No GPS in photo — enter a location.")
-                address = st.text_input("Address or intersection", placeholder="199 Chambers St, New York, NY")
-                if address:
-                    coords = geocode_address(address)
-                    if coords:
-                        lat, lng = coords
+                st.info("No GPS in photo — share your current location or enter an address.")
+
+                if st.button("📍 Use my current location", use_container_width=True):
+                    st.session_state.geo_requested = True
+
+                if st.session_state.get("geo_requested"):
+                    loc = get_geolocation()
+                    if loc and loc.get("coords"):
+                        lat = loc["coords"]["latitude"]
+                        lng = loc["coords"]["longitude"]
                         st.success(f"📍 {lat:.5f}, {lng:.5f}")
                     else:
-                        st.error("Couldn't find that address. Try adding the borough or zip.")
+                        st.caption("Allow location access in your browser when prompted…")
+
+                if lat is None:
+                    address = st.text_input("Or address / intersection", placeholder="199 Chambers St, New York, NY")
+                    if address:
+                        coords = geocode_address(address)
+                        if coords:
+                            lat, lng = coords
+                            st.success(f"📍 {lat:.5f}, {lng:.5f}")
+                        else:
+                            st.error("Couldn't find that address. Try adding the borough or zip.")
 
             if lat is not None and st.button("Classify & add to map", type="primary", use_container_width=True):
                 with st.spinner("Classifying with Claude Vision..."):
