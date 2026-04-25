@@ -231,6 +231,14 @@ def _render_mobile_panel() -> None:
         label_visibility="collapsed",
     )
 
+    # Pristine-state marker: no file and no result. CSS :has() uses this to shrink the
+    # panel so the map fills more of the screen on the very initial page load.
+    if uploaded is None and not has_result:
+        st.markdown(
+            "<div data-tai-pristine='1' style='display:none'></div>",
+            unsafe_allow_html=True,
+        )
+
     if uploaded:
         image_bytes = uploaded.getvalue()
         media_type = uploaded.type or "image/jpeg"
@@ -325,7 +333,8 @@ def _render_mobile_panel() -> None:
 
 
 def _render_mobile_layout() -> None:
-    _render_mobile_panel()
+    with st.container(key="mobile-panel"):
+        _render_mobile_panel()
     st_folium(_build_folium_map(), width=None, height=600, returned_objects=[], key="m_map")
 
 
@@ -399,8 +408,9 @@ st.markdown(
 
     /* =========================================================
        MOBILE LAYOUT (scoped to .st-key-mobile-root)
-       Hard 50/50 split: dense upload panel in top 50vh, map in bottom 50vh.
-       Never scrolls. Uses horizontal columns aggressively for density.
+       Dynamic split: panel grows from min 30vh up to max 50vh as content is added.
+       Map always fills remaining space (always >= 50vh, up to 70vh when panel is minimal).
+       Panel uses horizontal columns aggressively; Streamlit's default mobile-stacking is overridden.
        ========================================================= */
     @media (max-width: 640px) {
       .st-key-mobile-root {
@@ -413,41 +423,77 @@ st.markdown(
         box-sizing: border-box !important;
         overflow: hidden !important;
       }
-      /* Streamlit's inner vertical block becomes the flex column with 2 children: panel + map */
-      .st-key-mobile-root > div[data-testid='stVerticalBlockBorderWrapper'],
+      /* Inner stVerticalBlock = flex column holding (panel, map). */
+      .st-key-mobile-root > div[data-testid='stVerticalBlockBorderWrapper'] {
+        height: 100vh !important; max-height: 100vh !important;
+        width: 100% !important;
+      }
       .st-key-mobile-root > div[data-testid='stVerticalBlockBorderWrapper'] > div[data-testid='stVerticalBlock'] {
         display: flex !important;
         flex-direction: column !important;
         height: 100vh !important; max-height: 100vh !important;
         width: 100% !important;
         gap: 0 !important;
+        padding: 0 !important;
+        overflow: hidden !important;
       }
 
-      /* Every direct stElementContainer in the mobile root (text/caption/uploader/button/image) flows
-         inside a top-panel region capped at 50vh. The map element container is the bottom 50vh. */
-      /* Top panel: everything EXCEPT the map iframe container. Grouped via flex reshaping.
-         Trick: apply max-height on every non-iframe direct child's "run length" — but we need a wrapper.
-         Instead: cap the full vertical block to 100vh and force the map container to exactly 50vh so
-         the panel above it has to fit in the remaining 50vh. */
+      /* --- Panel: non-pristine = 50vh (fixed), pristine = 12vh (fixed).
+         Fixed heights so the map's explicit vh heights never overlap or leave gaps. --- */
+      .st-key-mobile-panel {
+        flex: 0 0 50vh !important;
+        height: 50vh !important; max-height: 50vh !important;
+        width: 100% !important;
+        padding: 0.5rem !important;
+        box-sizing: border-box !important;
+        overflow: hidden !important;
+      }
+      .st-key-mobile-panel:has([data-tai-pristine]) {
+        flex: 0 0 12vh !important;
+        height: 12vh !important; max-height: 12vh !important;
+      }
+      .st-key-mobile-panel > div[data-testid='stVerticalBlock'] {
+        gap: 0.35rem !important;
+        height: 100% !important;
+      }
+
+      /* --- Map: explicit viewport heights, no cascade dependency. --- */
+      /* Default (non-pristine): map = 50vh */
       .st-key-mobile-root [data-testid='stElementContainer']:has(iframe[title^='streamlit_folium']),
       .st-key-mobile-root [data-testid='stElementContainer']:has([data-testid='stCustomComponentV1']) {
         flex: 0 0 50vh !important;
-        height: 50vh !important; max-height: 50vh !important; min-height: 50vh !important;
+        height: 50vh !important; min-height: 50vh !important; max-height: 50vh !important;
         width: 100% !important;
         display: block !important;
+        overflow: hidden !important;
         margin: 0 !important; padding: 0 !important;
       }
       .st-key-mobile-root [data-testid='stElementContainer']:has(iframe[title^='streamlit_folium']) iframe,
       .st-key-mobile-root [data-testid='stElementContainer']:has([data-testid='stCustomComponentV1']) iframe,
       .st-key-mobile-root [data-testid='stElementContainer']:has([data-testid='stCustomComponentV1']) [data-testid='stCustomComponentV1'],
       .st-key-mobile-root [data-testid='stElementContainer']:has([data-testid='stCustomComponentV1']) [data-testid='stIFrame'] {
-        height: 50vh !important; max-height: 50vh !important; min-height: 50vh !important;
+        height: 50vh !important; min-height: 50vh !important; max-height: 50vh !important;
         width: 100% !important;
         display: block !important;
         border: 0 !important;
       }
-      /* :has() fallback */
+
+      /* Pristine: map = 88vh (takes whatever's left after the 12vh panel) */
+      .st-key-mobile-root:has([data-tai-pristine]) [data-testid='stElementContainer']:has(iframe[title^='streamlit_folium']),
+      .st-key-mobile-root:has([data-tai-pristine]) [data-testid='stElementContainer']:has([data-testid='stCustomComponentV1']) {
+        flex: 0 0 88vh !important;
+        height: 88vh !important; min-height: 88vh !important; max-height: 88vh !important;
+      }
+      .st-key-mobile-root:has([data-tai-pristine]) [data-testid='stElementContainer']:has(iframe[title^='streamlit_folium']) iframe,
+      .st-key-mobile-root:has([data-tai-pristine]) [data-testid='stElementContainer']:has([data-testid='stCustomComponentV1']) iframe,
+      .st-key-mobile-root:has([data-tai-pristine]) [data-testid='stElementContainer']:has([data-testid='stCustomComponentV1']) [data-testid='stCustomComponentV1'],
+      .st-key-mobile-root:has([data-tai-pristine]) [data-testid='stElementContainer']:has([data-testid='stCustomComponentV1']) [data-testid='stIFrame'] {
+        height: 88vh !important; min-height: 88vh !important; max-height: 88vh !important;
+      }
+
+      /* :has() fallback (older browsers) — skip pristine shrink, keep 50/50 */
       @supports not selector(:has(*)) {
+        .st-key-mobile-panel {height: 50vh !important; max-height: 50vh !important;}
         .st-key-mobile-root iframe[title^='streamlit_folium'],
         .st-key-mobile-root [data-testid='stCustomComponentV1'],
         .st-key-mobile-root [data-testid='stIFrame'] {
@@ -456,46 +502,49 @@ st.markdown(
         }
       }
 
-      /* --- Panel content (everything above the map) --- */
-      /* Panel must fit in 50vh. Tight spacing, no element scroll, no element-container margins. */
-      .st-key-mobile-root [data-testid='stVerticalBlock'] {gap: 0.3rem !important;}
-      .st-key-mobile-root [data-testid='stElementContainer'] {margin: 0 !important;}
-      .st-key-mobile-root div[data-testid='stHorizontalBlock'] {gap: 0.5rem !important; margin: 0 !important;}
+      /* --- CRITICAL: force st.columns to stay horizontal on mobile.
+         Streamlit's default CSS stacks columns at narrow widths; we override it here so our 2-col
+         dense layouts (title|pin, thumb|address, result-title|link-button, agency|service-type)
+         actually render side-by-side. --- */
+      .st-key-mobile-panel div[data-testid='stHorizontalBlock'] {
+        display: flex !important;
+        flex-direction: row !important;
+        flex-wrap: nowrap !important;
+        gap: 0.5rem !important;
+        margin: 0 !important;
+        width: 100% !important;
+      }
+      .st-key-mobile-panel div[data-testid='stHorizontalBlock'] > div[data-testid='stColumn'] {
+        min-width: 0 !important;
+        padding: 0 !important;
+      }
 
-      /* Padding on the panel edges only (not the map) */
-      .st-key-mobile-root > div[data-testid='stVerticalBlockBorderWrapper'] > div[data-testid='stVerticalBlock'] {
-        padding: 0.5rem !important;
-      }
-      /* Remove padding we just added for the map container, which is a child of that block */
-      .st-key-mobile-root [data-testid='stElementContainer']:has(iframe[title^='streamlit_folium']),
-      .st-key-mobile-root [data-testid='stElementContainer']:has([data-testid='stCustomComponentV1']) {
-        margin: 0 -0.5rem -0.5rem !important;
-        width: calc(100% + 1rem) !important;
-      }
+      /* Element container margins zeroed */
+      .st-key-mobile-panel [data-testid='stElementContainer'] {margin: 0 !important;}
 
       /* Custom header classes */
       .st-key-mobile-root .tai-m-title {
-        font-size: 1.25rem; font-weight: 700; line-height: 1.2; margin: 0; padding: 0;
+        font-size: 1.2rem; font-weight: 700; line-height: 1.15; margin: 0; padding: 0;
       }
       .st-key-mobile-root .tai-m-pins {
-        font-size: 0.8rem; line-height: 1.2; text-align: right; opacity: 0.85;
-        padding-top: 0.3rem;
+        font-size: 0.78rem; line-height: 1.15; text-align: right; opacity: 0.85;
+        padding-top: 0.35rem;
       }
       .st-key-mobile-root .tai-m-restitle {
-        font-size: 1.05rem; font-weight: 700; line-height: 1.2; margin: 0.1rem 0;
+        font-size: 1rem; font-weight: 700; line-height: 1.2; margin: 0; padding-top: 0.3rem;
       }
       .st-key-mobile-root .tai-m-meta {
-        font-size: 0.78rem; line-height: 1.25; margin: 0;
+        font-size: 0.75rem; line-height: 1.25; margin: 0;
       }
       .st-key-mobile-root .tai-m-svc {text-align: right;}
       .st-key-mobile-root .tai-m-instr {
-        font-size: 0.78rem; line-height: 1.3; margin: 0.2rem 0 0 0; opacity: 0.92;
+        font-size: 0.75rem; line-height: 1.3; margin: 0.15rem 0 0 0; opacity: 0.92;
       }
       .st-key-mobile-root .tai-m-notes {
-        font-size: 0.72rem; line-height: 1.25; margin: 0.2rem 0 0 0; opacity: 0.75;
+        font-size: 0.7rem; line-height: 1.25; margin: 0.15rem 0 0 0; opacity: 0.75;
       }
 
-      /* Compact typography + form controls */
+      /* Heading/markdown resets */
       .st-key-mobile-root h1, .st-key-mobile-root h2, .st-key-mobile-root h3 {
         display: block !important; position: static !important;
       }
@@ -506,20 +555,33 @@ st.markdown(
       .st-key-mobile-root [data-testid='stCaptionContainer'],
       .st-key-mobile-root .stCaption,
       .st-key-mobile-root small {
-        margin: 0 !important; padding: 0 !important; line-height: 1.25 !important; font-size: 0.75rem !important;
+        margin: 0 !important; padding: 0 !important; line-height: 1.2 !important; font-size: 0.72rem !important;
       }
-      .st-key-mobile-root [data-testid='stAlert'] {padding: 0.3rem 0.5rem !important; margin: 0 !important; font-size: 0.8rem !important;}
+      .st-key-mobile-root [data-testid='stAlert'] {
+        padding: 0.25rem 0.45rem !important; margin: 0 !important; font-size: 0.75rem !important;
+      }
+
+      /* File uploader: compact; hide the dropzone instructions once a file is uploaded to save ~60px */
       .st-key-mobile-root [data-testid='stFileUploader'] {margin: 0 !important;}
-      .st-key-mobile-root [data-testid='stFileUploaderDropzone'] {padding: 0.35rem 0.5rem !important; min-height: 0 !important;}
-      .st-key-mobile-root [data-testid='stFileUploaderFile'] {padding: 0.15rem 0.3rem !important; font-size: 0.75rem !important;}
+      .st-key-mobile-root [data-testid='stFileUploaderDropzone'] {
+        padding: 0.3rem 0.5rem !important; min-height: 0 !important;
+      }
+      .st-key-mobile-root [data-testid='stFileUploaderFile'] {
+        padding: 0.15rem 0.3rem !important; font-size: 0.72rem !important;
+      }
+      .st-key-mobile-root [data-testid='stFileUploader']:has([data-testid='stFileUploaderFile']) [data-testid='stFileUploaderDropzone'] {
+        display: none !important;
+      }
+
+      /* Form controls — flat, tight */
       .st-key-mobile-root [data-testid='stTextInput'] input {
-        padding: 0.25rem 0.5rem !important; font-size: 0.8rem !important; height: 1.9rem !important; min-height: 0 !important;
+        padding: 0.2rem 0.5rem !important; font-size: 0.78rem !important; height: 1.8rem !important; min-height: 0 !important;
       }
       .st-key-mobile-root [data-testid='stButton'] button {
-        padding: 0.25rem 0.5rem !important; font-size: 0.8rem !important; min-height: 0 !important; height: 1.9rem !important;
+        padding: 0.2rem 0.5rem !important; font-size: 0.8rem !important; min-height: 0 !important; height: 1.9rem !important;
       }
       .st-key-mobile-root [data-testid='stLinkButton'] a {
-        padding: 0.25rem 0.5rem !important; font-size: 0.78rem !important; min-height: 0 !important; height: 1.9rem !important;
+        padding: 0.2rem 0.4rem !important; font-size: 0.75rem !important; min-height: 0 !important; height: 1.8rem !important;
         display: inline-flex !important; align-items: center !important; justify-content: center !important;
       }
 
@@ -537,7 +599,7 @@ st.markdown(
       }
 
       /* Safety: no element in the panel may overflow horizontally */
-      .st-key-mobile-root > div[data-testid='stVerticalBlockBorderWrapper'] > div[data-testid='stVerticalBlock'] > [data-testid='stElementContainer']:not(:has(iframe[title^='streamlit_folium'])):not(:has([data-testid='stCustomComponentV1'])) {
+      .st-key-mobile-panel [data-testid='stElementContainer'] {
         max-width: 100% !important; box-sizing: border-box !important;
       }
     }
