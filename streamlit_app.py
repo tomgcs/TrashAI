@@ -4,7 +4,7 @@ from io import BytesIO
 
 import folium
 import streamlit as st
-from PIL import Image
+from PIL import Image, ImageOps
 from streamlit_folium import st_folium
 
 from classify import classify_image, is_stub_mode
@@ -35,6 +35,7 @@ CATEGORY_COLORS = {
 
 def _thumbnail(image_bytes: bytes, max_size: int = 400) -> bytes:
     img = Image.open(BytesIO(image_bytes))
+    img = ImageOps.exif_transpose(img)
     img.thumbnail((max_size, max_size))
     if img.mode != "RGB":
         img = img.convert("RGB")
