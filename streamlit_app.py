@@ -337,6 +337,9 @@ with right:
                         else:
                             st.success("✓ You're in this group")
 
+    # Bottom spacer so the last element clears the viewport when the panel is scrolled all the way down on desktop.
+    st.markdown("<div style='height:6rem'></div>", unsafe_allow_html=True)
+
 with left:
     pins = load_pins()
     m = folium.Map(
