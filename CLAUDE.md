@@ -57,8 +57,12 @@ Keep the stub working. It's how teammates without an API key develop the UI, and
 ### Image downscale before Anthropic call
 Anthropic caps image payloads at **5 MB base64** (~3.75 MB raw). Phone photos routinely exceed this. [classify.py](classify.py) has `_prepare_for_api` that resizes to max 1600px on the longest side + JPEG quality 85 before encoding. The **original full-resolution photo** is what gets written to disk and shown in the map popup — only the API-bound copy is downsized. Don't remove this without raising the API limit another way.
 
-### Geocoding is bounded to NYC
-[location.py](location.py) calls Nominatim with `country_codes="us"`, `viewbox=[(40.477, -74.260), (40.920, -73.700)]`, and `bounded=True`. Addresses outside NYC return `None` rather than geocoding elsewhere. This prevents the "199 chamber street → UK" failure mode. If you ever widen scope beyond NYC, update the viewbox; don't remove `bounded=True` without replacement scoping.
+### Geocoding is bounded to NYC — EXIF is not
+[location.py](location.py) calls Nominatim with `country_codes="us"`, `viewbox=[(40.477, -74.260), (40.920, -73.700)]`, and `bounded=True`. Typed addresses outside NYC return `None` rather than geocoding elsewhere. This prevents the "199 chamber street → UK" failure mode.
+
+**`get_location_from_exif` is NOT bounded.** If a user uploads a photo taken in London, the EXIF GPS (51.51, -0.07) is returned as-is and the pin lands off the NYC map. This has already happened in the live `pins.json`. Intentional for now (keeps the uploader simple and doesn't punish genuinely-in-NYC users whose EXIF has a few meters of drift outside the viewbox), but if the user complains about foreign pins, gate EXIF through the same NYC viewbox check before accepting it.
+
+If you ever widen scope beyond NYC, update the viewbox; don't remove `bounded=True` without replacement scoping.
 
 ### Pin schema
 Each entry in `data/pins.json` is:
