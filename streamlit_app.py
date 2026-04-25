@@ -8,6 +8,7 @@ from PIL import Image, ImageOps
 from streamlit_folium import st_folium
 
 from classify import classify_image, is_stub_mode
+from groups import join_group, load_groups, save_group
 from location import geocode_address, get_location_from_exif
 from routing import get_guide
 from storage import load_image, load_pins, save_pin
@@ -48,6 +49,10 @@ st.set_page_config(page_title="TrashAI", page_icon="📍", layout="wide")
 
 if "last_result" not in st.session_state:
     st.session_state.last_result = None
+if "groups_mode" not in st.session_state:
+    st.session_state.groups_mode = False
+if "display_name" not in st.session_state:
+    st.session_state.display_name = None
 
 st.markdown(
     """
@@ -101,10 +106,13 @@ st.markdown(
         height: 100vh !important; width: 100% !important; display: block !important;
         border: 0 !important; min-height: 100vh !important;
       }
-      /* Right column: scroll internally */
+      /* Right column: scroll internally, tighter gaps */
       div[data-testid='stHorizontalBlock'] > div[data-testid='stColumn']:last-child {
         overflow-y: auto !important;
         padding: 1.5rem 1.75rem !important;
+      }
+      div[data-testid='stHorizontalBlock'] > div[data-testid='stColumn']:last-child > div[data-testid='stVerticalBlock'] {
+        gap: 0.5rem !important;
       }
     }
     /* Mobile: no scroll anywhere, upload on top (compact), map filling remaining viewport */
@@ -192,65 +200,118 @@ with right:
     st.title("TrashAI")
     st.caption("Snap a photo of anything needing civic action in NYC. We'll tell you exactly where and how to report it.")
     if is_stub_mode():
-        st.warning("⚙️ Stub mode: Claude Vision is disabled. Add your API key to `.streamlit/secrets.toml` to enable real classification.")
+        st.caption("⚙️ Stub mode — add API key to `.streamlit/secrets.toml` to enable Claude Vision.")
     pin_count = len(load_pins())
     st.caption(f"📍 {pin_count} pinned on the map")
-    uploaded = st.file_uploader("Upload a photo", type=["jpg", "jpeg", "png"])
-    st.markdown("<p style='font-size:0.75rem;font-style:italic;font-weight:600;color:#888;text-align:center;margin-top:2px'>AI can make mistakes.<br>Always verify the category and instructions before filing a report.</p>", unsafe_allow_html=True)
 
-    if uploaded:
-        image_bytes = uploaded.getvalue()
-        media_type = uploaded.type or "image/jpeg"
-        st.image(image_bytes, use_container_width=True)
+    # Mode toggle
+    mode = st.radio("", ["📤  Upload", "👤  Groups"], horizontal=True,
+                    label_visibility="collapsed",
+                    index=1 if st.session_state.groups_mode else 0)
+    st.session_state.groups_mode = (mode == "👤  Groups")
 
-        lat, lng = None, None
-        gps = get_location_from_exif(image_bytes)
-        if gps:
-            lat, lng = gps
-            st.success(f"📍 {lat:.5f}, {lng:.5f}")
-        else:
-            st.info("No GPS in photo — enter a location.")
-            address = st.text_input("Address or intersection", placeholder="199 Chambers St, New York, NY")
-            if address:
-                coords = geocode_address(address)
-                if coords:
-                    lat, lng = coords
-                    st.success(f"📍 {lat:.5f}, {lng:.5f}")
+    # ── Upload mode ──────────────────────────────────────────────────────────
+    if not st.session_state.groups_mode:
+        uploaded = st.file_uploader("Upload a photo", type=["jpg", "jpeg", "png"])
+        st.markdown("<p style='font-size:0.75rem;font-style:italic;font-weight:600;color:#888;text-align:center;margin-top:2px'>AI can make mistakes.<br>Always verify the category and instructions before filing a report.</p>", unsafe_allow_html=True)
+
+        if uploaded:
+            image_bytes = uploaded.getvalue()
+            media_type = uploaded.type or "image/jpeg"
+            st.image(image_bytes, use_container_width=True)
+
+            lat, lng = None, None
+            gps = get_location_from_exif(image_bytes)
+            if gps:
+                lat, lng = gps
+                st.success(f"📍 {lat:.5f}, {lng:.5f}")
+            else:
+                st.info("No GPS in photo — enter a location.")
+                address = st.text_input("Address or intersection", placeholder="199 Chambers St, New York, NY")
+                if address:
+                    coords = geocode_address(address)
+                    if coords:
+                        lat, lng = coords
+                        st.success(f"📍 {lat:.5f}, {lng:.5f}")
+                    else:
+                        st.error("Couldn't find that address. Try adding the borough or zip.")
+
+            if lat is not None and st.button("Classify & add to map", type="primary", use_container_width=True):
+                with st.spinner("Classifying with Claude Vision..."):
+                    result = classify_image(image_bytes, media_type=media_type)
+                guide = get_guide(result["category"])
+                save_pin(
+                    lat=lat,
+                    lng=lng,
+                    category=result["category"],
+                    display_name=guide["display_name"],
+                    image_bytes=image_bytes,
+                    reasoning=result.get("reasoning", ""),
+                    notable_details=result.get("notable_details", ""),
+                    confidence=result.get("confidence", ""),
+                )
+                st.session_state.last_result = (result, guide)
+                st.rerun()
+
+        if st.session_state.last_result:
+            result, guide = st.session_state.last_result
+            st.divider()
+            st.subheader(f"How to report: {guide['display_name']}")
+            st.markdown(f"**Detected:** `{result['category']}` · {result['confidence']}")
+            if result.get("reasoning"):
+                st.caption(result["reasoning"])
+            st.markdown(f"**Agency:** {guide['agency']}")
+            st.markdown(f"**Channel:** {guide['channel']}")
+            st.markdown(f"**Select:** _{guide['service_type']}_")
+            st.markdown(f"**What to do:** {guide['instructions']}")
+            if result.get("notable_details"):
+                st.info(f"Include: {result['notable_details']}")
+            if guide.get("link"):
+                st.link_button("Open reporting page", guide["link"], use_container_width=True)
+
+    # ── Groups mode ───────────────────────────────────────────────────────────
+    else:
+        if st.session_state.display_name is None:
+            st.markdown("**What's your name?**")
+            st.caption("Only used to identify you in groups. Never stored beyond this session.")
+            name = st.text_input("Display name", placeholder="e.g. Alex", label_visibility="collapsed")
+            if st.button("Continue", type="primary", use_container_width=True):
+                if name.strip():
+                    st.session_state.display_name = name.strip()
+                    st.rerun()
                 else:
-                    st.error("Couldn't find that address. Try adding the borough or zip.")
+                    st.error("Please enter a name.")
+        else:
+            st.caption(f"Signed in as **{st.session_state.display_name}**")
 
-        if lat is not None and st.button("Classify & add to map", type="primary", use_container_width=True):
-            with st.spinner("Classifying with Claude Vision..."):
-                result = classify_image(image_bytes, media_type=media_type)
-            guide = get_guide(result["category"])
-            save_pin(
-                lat=lat,
-                lng=lng,
-                category=result["category"],
-                display_name=guide["display_name"],
-                image_bytes=image_bytes,
-                reasoning=result.get("reasoning", ""),
-                notable_details=result.get("notable_details", ""),
-                confidence=result.get("confidence", ""),
-            )
-            st.session_state.last_result = (result, guide)
-            st.rerun()
+            with st.expander("➕  Create a group"):
+                g_title = st.text_input("Group name", placeholder="Prospect Park Cleanup")
+                g_neighborhood = st.text_input("Neighborhood", placeholder="Park Slope, Brooklyn")
+                g_time = st.text_input("When", placeholder="Saturday Apr 26 at 10am")
+                if st.button("Create group", type="primary", use_container_width=True):
+                    if g_title.strip() and g_neighborhood.strip() and g_time.strip():
+                        save_group(g_title.strip(), g_neighborhood.strip(), g_time.strip(), st.session_state.display_name)
+                        st.success("Group created!")
+                        st.rerun()
+                    else:
+                        st.error("Fill in all three fields.")
 
-    if st.session_state.last_result:
-        result, guide = st.session_state.last_result
-        st.divider()
-        st.subheader(f"How to report: {guide['display_name']}")
-        st.markdown(f"**Detected:** `{result['category']}` · {result['confidence']}")
-        if result.get("reasoning"):
-            st.caption(result["reasoning"])
-        st.markdown(f"**Agency:** {guide['agency']}")
-        st.markdown(f"**Channel:** {guide['channel']}")
-        st.markdown(f"**Select:** _{guide['service_type']}_")
-        st.markdown(f"**What to do:** {guide['instructions']}")
-        if result.get("notable_details"):
-            st.info(f"Include: {result['notable_details']}")
-        if guide.get("link"):
-            st.link_button("Open reporting page", guide["link"], use_container_width=True)
+            groups = load_groups()
+            if not groups:
+                st.info("No groups yet — create one above.")
+            else:
+                for g in groups:
+                    member_count = len(g.get("members", []))
+                    st.markdown(f"**{g['title']}**")
+                    st.caption(f"📍 {g['neighborhood']}  ·  🕐 {g['meetup_time']}")
+                    st.caption(f"👥 {member_count} member{'s' if member_count != 1 else ''}  ·  Started by {g['creator']}")
+                    if st.session_state.display_name in g.get("members", []):
+                        st.success("✓ You're in this group")
+                    else:
+                        if st.button("Join", key=f"join_{g['id']}", use_container_width=True):
+                            join_group(g["id"], st.session_state.display_name)
+                            st.rerun()
+                    st.divider()
 
 with left:
     pins = load_pins()
