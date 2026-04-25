@@ -13,6 +13,7 @@ Built for the **CUNY AI Innovation Challenge — Spring 2026**, Software track, 
 - **Production URL:** https://trashai-5appeqpxzalkzbg3jnjjmun.streamlit.app
 - **Hosted on:** Streamlit Community Cloud, free tier.
 - **Branch:** `main` auto-deploys on every push (~30-60s delay). **There is no staging env — `main` is production.**
+- **Data persistence:** Files written to `data/` (pins.json, groups.json, images/) survive code redeploys — Streamlit Cloud preserves the working tree across pushes. They only get wiped by a manual reboot from the dashboard or by a code-level wipe (commit a one-shot `shutil.rmtree`, deploy, then revert). A push is not a reset.
 - **Rollback:** `git revert <sha> && git push` — auto-redeploys to working state.
 - **Reboot without push:** dashboard → "Manage app" → "Reboot" (useful when the container is weird but code is fine).
 
@@ -98,7 +99,7 @@ Popup HTML in [streamlit_app.py](streamlit_app.py) renders `display_name`, `reas
 ### Storage model
 - `data/pins.json` is a flat list. `save_pin` appends + rewrites the whole file (fine at N<1000).
 - `load_pins` runs on every Streamlit rerun. No caching yet — if pins grow large, add `@st.cache_data` keyed on the file mtime.
-- On Streamlit Cloud, the container filesystem is **shared across all visitors** but **ephemeral**: resets on every commit/redeploy, manual reboot, or long idle (~7 days). Acceptable for a demo.
+- On Streamlit Cloud, the container filesystem is **shared across all visitors**. Files written to `data/` persist across code pushes/redeploys — only a manual reboot from the dashboard, or a code-level wipe (one-shot `shutil.rmtree` deployed then reverted), clears them. Long idle eventually recycles the container too.
 - Do not commit `data/pins.json` or user images. `.gitignore` already handles this.
 
 ### Secrets
@@ -131,14 +132,14 @@ Harmless startup warning: `urllib3 ... LibreSSL 2.8.3`. It's a macOS-only SSL li
 |---|---|---|
 | RAM | ~1 GB | Baseline usage ~200 MB; safe for hundreds of pins. |
 | CPU | Shared, fractional core | Slow but adequate. Latency is dominated by Claude API round-trip (~3-6s). |
-| Disk | ~50 GB, ephemeral | Wiped on every redeploy / reboot / long idle. |
+| Disk | ~50 GB | Persists across code pushes. Wiped only by manual reboot or long idle. |
 | Concurrent users | 1 container, 1 Streamlit worker | Queued under load. Fine for a hackathon demo. |
 | GPU | None | Irrelevant — vision runs via API. |
 | Cold start | ~20-30s | Warm the URL 5 min before a demo. |
 
 ## Demo-day rules
 
-- **Do not push to `main` within ~30 minutes of a demo.** Every push wipes `data/pins.json` and `data/images/*`.
+- **Avoid pushing to `main` within ~5 minutes of a demo** — the redeploy briefly takes the site offline. Pins, images, and groups survive the redeploy, so the map state is safe.
 - **Warm the site with one page load** 5 min before the demo to avoid a cold-start during the pitch.
 - **Seed pins manually** on the live site right before judging so the map isn't empty. They'll survive until the next deploy or ~7-day idle.
 
