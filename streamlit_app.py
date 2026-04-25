@@ -1,9 +1,18 @@
 import base64
 import html
+import shutil
 from io import BytesIO
+from pathlib import Path
 
 import folium
 import streamlit as st
+
+# TEMP: one-shot wipe of persistent data on Streamlit Cloud. Revert next push.
+_wipe_dir = Path(__file__).parent / "data"
+shutil.rmtree(_wipe_dir / "images", ignore_errors=True)
+(_wipe_dir / "pins.json").unlink(missing_ok=True)
+(_wipe_dir / "groups.json").unlink(missing_ok=True)
+(_wipe_dir / "images").mkdir(parents=True, exist_ok=True)
 from PIL import Image, ImageOps
 from streamlit_folium import st_folium
 from streamlit_js_eval import get_geolocation
