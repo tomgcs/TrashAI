@@ -248,19 +248,26 @@ with right:
             if lat is not None and st.button("Classify & add to map", type="primary", use_container_width=True):
                 with st.spinner("Classifying with Claude Vision..."):
                     result = classify_image(image_bytes, media_type=media_type)
-                guide = get_guide(result["category"])
-                save_pin(
-                    lat=lat,
-                    lng=lng,
-                    category=result["category"],
-                    display_name=guide["display_name"],
-                    image_bytes=image_bytes,
-                    reasoning=result.get("reasoning", ""),
-                    notable_details=result.get("notable_details", ""),
-                    confidence=result.get("confidence", ""),
-                )
-                st.session_state.last_result = (result, guide)
-                st.rerun()
+                if result["category"] == "other":
+                    st.session_state.last_result = None
+                    st.warning(
+                        "This doesn't look like a NYC civic issue we can route. "
+                        "Try a clearer photo of trash, a pothole, graffiti, a fallen sign, etc."
+                    )
+                else:
+                    guide = get_guide(result["category"])
+                    save_pin(
+                        lat=lat,
+                        lng=lng,
+                        category=result["category"],
+                        display_name=guide["display_name"],
+                        image_bytes=image_bytes,
+                        reasoning=result.get("reasoning", ""),
+                        notable_details=result.get("notable_details", ""),
+                        confidence=result.get("confidence", ""),
+                    )
+                    st.session_state.last_result = (result, guide)
+                    st.rerun()
 
         if st.session_state.last_result:
             result, guide = st.session_state.last_result
