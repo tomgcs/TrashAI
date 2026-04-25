@@ -562,23 +562,50 @@ st.markdown(
       }
 
       /* File uploader: compact; hide the dropzone instructions once a file is uploaded to save ~60px */
-      .st-key-mobile-root [data-testid='stFileUploader'] {margin: 0 !important;}
-      .st-key-mobile-root [data-testid='stFileUploaderDropzone'] {
-        padding: 0.5rem 0.75rem !important; min-height: 0 !important;
-        justify-content: center !important;
-        text-align: center !important;
+      .st-key-mobile-root [data-testid='stFileUploader'] {
+        margin: 0 !important;
+        width: 100% !important;
+        max-width: 100% !important;
+        overflow: hidden !important;
       }
-      /* Center the dropzone's icon + label so it reads like a button, not a banner */
-      .st-key-mobile-root [data-testid='stFileUploaderDropzone'] > section,
-      .st-key-mobile-root [data-testid='stFileUploaderDropzone'] > div {
+      .st-key-mobile-root [data-testid='stFileUploaderDropzone'] {
+        padding: 0.5rem 0.75rem !important;
+        min-height: 0 !important;
+        display: flex !important;
+        flex-direction: row !important;
+        flex-wrap: nowrap !important;
         justify-content: center !important;
         align-items: center !important;
-        width: auto !important;
-        flex: 0 0 auto !important;
+        width: 100% !important;
+        max-width: 100% !important;
+        box-sizing: border-box !important;
+        overflow: hidden !important;
+      }
+      /* Inner section/div: center within parent; let widths flow naturally so nothing overflows */
+      .st-key-mobile-root [data-testid='stFileUploaderDropzone'] > section,
+      .st-key-mobile-root [data-testid='stFileUploaderDropzone'] > div {
+        display: flex !important;
+        flex-direction: row !important;
+        justify-content: center !important;
+        align-items: center !important;
+        max-width: 100% !important;
+        min-width: 0 !important;
+        flex: 0 1 auto !important;
+        gap: 0.5rem !important;
       }
       .st-key-mobile-root [data-testid='stFileUploaderDropzoneInstructions'] {
-        padding-left: 0 !important; margin-left: 0 !important;
+        padding: 0 !important;
+        margin: 0 !important;
+        flex: 0 1 auto !important;
+        min-width: 0 !important;
+        max-width: 100% !important;
+      }
+      /* Browse files button — keep inside the dropzone bounds */
+      .st-key-mobile-root [data-testid='stFileUploaderDropzone'] button {
         flex: 0 0 auto !important;
+        max-width: 100% !important;
+        min-width: 0 !important;
+        white-space: nowrap !important;
       }
       .st-key-mobile-root [data-testid='stFileUploaderFile'] {
         padding: 0.15rem 0.3rem !important; font-size: 0.72rem !important;

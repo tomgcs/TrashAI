@@ -30,7 +30,7 @@ Built for the **CUNY AI Innovation Challenge — Spring 2026**, Software track, 
 
 | File | Role |
 |---|---|
-| [streamlit_app.py](streamlit_app.py) | UI entry point: upload, location resolution, result card, map render, popup HTML. |
+| [streamlit_app.py](streamlit_app.py) | UI entry point. Two parallel render trees (desktop + mobile) with scoped CSS — see "Two render trees" below. Helpers: `_build_folium_map`, `_render_upload_panel`, `_render_mobile_panel`, `_render_desktop_layout`, `_render_mobile_layout`. Pin border-color map (`CATEGORY_COLORS`) lives here too. |
 | [classify.py](classify.py) | Claude Vision call + image downscale + JSON parse + **stub fallback** when no API key. |
 | [prompt.py](prompt.py) | The single classification prompt string. Defines the 15 category IDs. |
 | [routing.py](routing.py) | `GUIDE` dict — category ID → agency, 311 link, service type, instructions. |
@@ -43,8 +43,21 @@ Built for the **CUNY AI Innovation Challenge — Spring 2026**, Software track, 
 
 ## Critical conventions
 
-### Category IDs are shared between two files
-`prompt.py` tells Claude which category IDs to return. `routing.py` has a `GUIDE` dict keyed by those same IDs. **If you add, rename, or remove a category, edit both.** `routing.get_guide` falls back to `"other"` for unknown IDs, so a mismatch fails soft but silently.
+### Category IDs are shared between three files
+`prompt.py` tells Claude which category IDs to return. `routing.py` has a `GUIDE` dict keyed by those same IDs. `streamlit_app.py` has a `CATEGORY_COLORS` dict keyed by those same IDs (drives the pin's border color on the map). **If you add, rename, or remove a category, edit all three.** `routing.get_guide` and `CATEGORY_COLORS.get` both fall back to `"other"` / white for unknown IDs, so a mismatch fails soft but silently.
+
+### "other" category does not save a pin
+When Claude (or the stub) returns `category: "other"`, [streamlit_app.py](streamlit_app.py) shows a yellow warning and **skips `save_pin` and the result card entirely**. This is intentional — the map is for genuine NYC civic issues, not random photos. Don't drop this guard if you refactor the classify flow.
+
+### Two render trees (desktop + mobile)
+[streamlit_app.py](streamlit_app.py) renders **both** layouts every run, wrapped in `st.container(key="desktop-root")` and `st.container(key="mobile-root")`. CSS media queries hide whichever doesn't match the viewport. This is the architecture's load-bearing trick — earlier attempts to use one DOM tree + CSS reflow broke every time Streamlit's component wrappers changed shape (especially after file upload). Don't merge them back.
+
+Consequences:
+- **Two `st_folium` iframes per rerun** (one per layout). Acceptable at current pin counts; if it drags, add `@st.cache_data` on `_thumbnail`.
+- **Widget keys must be unique across the two trees.** `_render_upload_panel(key_prefix)` accepts a prefix (`d` / `m`) and applies it to every `st.file_uploader`, `st.text_input`, `st.button` — otherwise Streamlit raises `DuplicateWidgetID`. The `st_folium` calls also need explicit `key=` (`d_map` / `m_map`) — `st_folium` auto-IDs from args and two identical map calls collide.
+- **All CSS is scoped under `.st-key-desktop-root` or `.st-key-mobile-root`.** When you add a CSS rule, scope it to the right tree or it'll leak.
+- **Mobile layout is pixel-tight.** Panel grows from `12vh` (pristine — no file, no result, detected via a hidden `[data-tai-pristine]` marker + CSS `:has()`) to `50vh` (after upload/result). Map fills the rest. The whole panel is capped — content must fit via density (horizontal columns), not scrolling. `st.columns` is force-flexed to `row` on mobile because Streamlit's default stacks them.
+- **Shared session state.** `st.session_state.last_result` is shared across both trees, so a result card classified on desktop also appears on mobile after a viewport switch.
 
 ### Python 3.9 compatibility
 Local dev is on macOS system Python 3.9. Do **not** use `X | Y` union syntax or `list[X]` / `dict[X, Y]` generic builtins in annotations — use `typing.Optional`, `typing.Tuple`, `typing.List`, `typing.Dict`. Streamlit Cloud runs 3.11 and so does the devcontainer, so either syntax works there — the constraint is local dev only.
