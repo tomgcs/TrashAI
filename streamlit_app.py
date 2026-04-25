@@ -332,7 +332,15 @@ with right:
 
 with left:
     pins = load_pins()
-    m = folium.Map(location=NYC_CENTER, zoom_start=11, tiles="cartodbpositron")
+    m = folium.Map(
+        location=NYC_CENTER,
+        zoom_start=11,
+        tiles="cartodbpositron",
+        min_zoom=10,
+    )
+    # Constrain panning to a buffered NYC bounding box so users can't drift to the rest of the world.
+    m.options["maxBounds"] = [[40.40, -74.40], [41.00, -73.55]]
+    m.options["maxBoundsViscosity"] = 1.0
     m.get_root().header.add_child(folium.Element(
         "<style>html,body{height:100%!important;margin:0!important;overflow:hidden!important;}"
         ".folium-map,#" + m.get_name() + "{height:100vh!important;width:100vw!important;}</style>"
