@@ -10,7 +10,7 @@ Built for the **CUNY AI Innovation Challenge — Spring 2026**, Software track, 
 
 ## Live deployment
 
-- **Production URL:** https://trashai-5appeqpxzalkzbg3njjjmun.streamlit.app
+- **Production URL:** https://trashai-5appeqpxzalkzbg3jnjjmun.streamlit.app
 - **Hosted on:** Streamlit Community Cloud, free tier.
 - **Branch:** `main` auto-deploys on every push (~30-60s delay). **There is no staging env — `main` is production.**
 - **Rollback:** `git revert <sha> && git push` — auto-redeploys to working state.
