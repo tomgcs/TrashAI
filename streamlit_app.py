@@ -53,6 +53,8 @@ if "groups_mode" not in st.session_state:
     st.session_state.groups_mode = False
 if "display_name" not in st.session_state:
     st.session_state.display_name = None
+if "create_group_open" not in st.session_state:
+    st.session_state.create_group_open = False
 
 st.markdown(
     """
@@ -276,34 +278,42 @@ with right:
         else:
             st.caption(f"Signed in as **{st.session_state.display_name}**")
 
-            with st.expander("➕  Create a group"):
+            with st.expander("➕  Create a group", expanded=st.session_state.create_group_open):
+                st.session_state.create_group_open = True
                 g_title = st.text_input("Group name", placeholder="Prospect Park Cleanup")
                 g_neighborhood = st.text_input("Neighborhood", placeholder="Park Slope, Brooklyn")
+                g_location = st.text_input("Meetup location", placeholder="Main entrance, 9th St & Prospect Park W")
                 g_time = st.text_input("When", placeholder="Saturday Apr 26 at 10am")
                 if st.button("Create group", type="primary", use_container_width=True):
-                    if g_title.strip() and g_neighborhood.strip() and g_time.strip():
-                        save_group(g_title.strip(), g_neighborhood.strip(), g_time.strip(), st.session_state.display_name)
-                        st.success("Group created!")
+                    if g_title.strip() and g_neighborhood.strip() and g_location.strip() and g_time.strip():
+                        save_group(g_title.strip(), g_neighborhood.strip(), g_location.strip(), g_time.strip(), st.session_state.display_name)
+                        st.session_state.create_group_open = False
                         st.rerun()
                     else:
-                        st.error("Fill in all three fields.")
+                        st.error("Fill in all four fields.")
 
             groups = load_groups()
             if not groups:
                 st.info("No groups yet — create one above.")
             else:
                 for g in groups:
-                    member_count = len(g.get("members", []))
-                    st.markdown(f"**{g['title']}**")
-                    st.caption(f"📍 {g['neighborhood']}  ·  🕐 {g['meetup_time']}")
-                    st.caption(f"👥 {member_count} member{'s' if member_count != 1 else ''}  ·  Started by {g['creator']}")
-                    if st.session_state.display_name in g.get("members", []):
-                        st.success("✓ You're in this group")
-                    else:
-                        if st.button("Join", key=f"join_{g['id']}", use_container_width=True):
-                            join_group(g["id"], st.session_state.display_name)
-                            st.rerun()
-                    st.divider()
+                    members = g.get("members", [])
+                    member_count = len(members)
+                    is_member = st.session_state.display_name in members
+                    label = f"{'✓ ' if is_member else ''}**{g['title']}** · 👥 {member_count}"
+                    with st.expander(label):
+                        st.caption(f"📍 {g['neighborhood']}  ·  🕐 {g['meetup_time']}")
+                        st.caption(f"📌 {g.get('meetup_location', 'TBD')}")
+                        st.caption(f"Started by {g['creator']}")
+                        st.markdown("**Members:**")
+                        for m in members:
+                            st.markdown(f"- {m}")
+                        if not is_member:
+                            if st.button("Join", key=f"join_{g['id']}", use_container_width=True):
+                                join_group(g["id"], st.session_state.display_name)
+                                st.rerun()
+                        else:
+                            st.success("✓ You're in this group")
 
 with left:
     pins = load_pins()

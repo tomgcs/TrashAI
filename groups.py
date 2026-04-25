@@ -16,12 +16,13 @@ def load_groups() -> List[Dict]:
         return []
 
 
-def save_group(title: str, neighborhood: str, meetup_time: str, creator: str) -> Dict:
+def save_group(title: str, neighborhood: str, meetup_location: str, meetup_time: str, creator: str) -> Dict:
     groups = load_groups()
     group = {
         "id": uuid.uuid4().hex[:8],
         "title": title,
         "neighborhood": neighborhood,
+        "meetup_location": meetup_location,
         "meetup_time": meetup_time,
         "creator": creator,
         "members": [creator],
