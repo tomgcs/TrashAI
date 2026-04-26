@@ -1,5 +1,6 @@
 import json
 import uuid
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Optional
 
@@ -40,6 +41,7 @@ def save_pin(
         "reasoning": reasoning,
         "notable_details": notable_details,
         "confidence": confidence,
+        "created_at": datetime.now(timezone.utc).isoformat(),
     }
     pins = load_pins()
     pins.append(pin)

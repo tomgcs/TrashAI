@@ -1,6 +1,8 @@
 import base64
 import html
+from datetime import datetime
 from io import BytesIO
+from zoneinfo import ZoneInfo
 
 import folium
 import streamlit as st
@@ -33,6 +35,18 @@ CATEGORY_COLORS = {
     "abandoned_vehicle": "#ea580c",
     "other": "#ffffff",
 }
+
+
+_NYC_TZ = ZoneInfo("America/New_York")
+
+
+def _format_pin_timestamp(iso_str: str) -> str:
+    try:
+        dt = datetime.fromisoformat(iso_str).astimezone(_NYC_TZ)
+    except (ValueError, TypeError):
+        return ""
+    time_part = dt.strftime("%I:%M %p").lstrip("0")
+    return f"{dt.strftime('%b')} {dt.day}, {dt.year} · {time_part} ET"
 
 
 def _thumbnail(image_bytes: bytes, max_size: int = 400) -> bytes:
@@ -370,6 +384,7 @@ with left:
         reasoning = html.escape(pin.get("reasoning", ""))
         notable_details = html.escape(pin.get("notable_details", ""))
         confidence = html.escape(pin.get("confidence", ""))
+        created_at = html.escape(_format_pin_timestamp(pin.get("created_at", "")))
 
         reasoning_html = (
             f"<div style='margin-top:6px;font-size:12px;color:#333;line-height:1.3'>{reasoning}</div>"
@@ -388,6 +403,12 @@ with left:
             if confidence
             else ""
         )
+        timestamp_html = (
+            f"<div style='margin-top:6px;font-size:10px;color:#888'>"
+            f"Added {created_at}</div>"
+            if created_at
+            else ""
+        )
         popup_html = (
             f"<div style='font-family:sans-serif;max-width:240px'>"
             f"<div style='font-weight:600;font-size:13px;margin-bottom:4px'>{display_name}</div>"
@@ -395,6 +416,7 @@ with left:
             f"{reasoning_html}"
             f"{details_html}"
             f"{confidence_html}"
+            f"{timestamp_html}"
             f"</div>"
         )
         border_color = CATEGORY_COLORS.get(pin.get("category", ""), "#ffffff")
