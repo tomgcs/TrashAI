@@ -250,7 +250,7 @@ with right:
                         st.caption("Allow location access in your browser when prompted…")
 
                 if lat is None:
-                    address = st.text_input("Or address / intersection", placeholder="199 Chambers St, New York, NY")
+                    address = st.text_input("Or address", placeholder="199 Chambers St, New York, NY")
                     if address:
                         coords = geocode_address(address)
                         if coords:

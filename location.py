@@ -1,15 +1,14 @@
+import json
 from io import BytesIO
 from typing import Optional, Tuple
+from urllib.parse import urlencode
+from urllib.request import Request, urlopen
 
 from PIL import Image
-from geopy.geocoders import Nominatim
 
 _GPS_IFD_TAG = 0x8825
-_geocoder = Nominatim(user_agent="trashai-cuny-aic-2026")
-
-# NYC bounding box: covers all 5 boroughs with a small buffer.
-# (sw_lat, sw_lng), (ne_lat, ne_lng)
-_NYC_VIEWBOX = [(40.477, -74.260), (40.920, -73.700)]
+_GEOSEARCH_URL = "https://geosearch.planninglabs.nyc/v2/search"
+_USER_AGENT = "trashai-cuny-aic-2026 (contact: tomgao628@gmail.com)"
 
 
 def get_location_from_exif(image_bytes: bytes) -> Optional[Tuple[float, float]]:
@@ -29,19 +28,23 @@ def get_location_from_exif(image_bytes: bytes) -> Optional[Tuple[float, float]]:
 
 
 def geocode_address(address: str) -> Optional[Tuple[float, float]]:
+    # NYC DCP GeoSearch (Pelias). NYC-only by design, no API key, no Nominatim
+    # IP blocks. Returns the top-ranked match.
+    query = urlencode({"text": address, "size": 1})
+    req = Request(f"{_GEOSEARCH_URL}?{query}", headers={"User-Agent": _USER_AGENT})
     try:
-        location = _geocoder.geocode(
-            address,
-            timeout=10,
-            country_codes="us",
-            viewbox=_NYC_VIEWBOX,
-            bounded=True,
-        )
-        if location:
-            return (location.latitude, location.longitude)
-        return None
+        with urlopen(req, timeout=10) as resp:
+            data = json.load(resp)
     except Exception:
         return None
+    features = data.get("features") or []
+    if not features:
+        return None
+    coords = features[0].get("geometry", {}).get("coordinates")
+    if not coords or len(coords) < 2:
+        return None
+    lng, lat = coords[0], coords[1]
+    return (float(lat), float(lng))
 
 
 def _dms_to_deg(dms, ref: str) -> float:
